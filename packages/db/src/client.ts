@@ -430,7 +430,8 @@ async function listJournalMigrationFiles(): Promise<string[]> {
 }
 
 async function readMigrationFileContent(migrationFile: string): Promise<string> {
-  return readFile(new URL(`./migrations/${migrationFile}`, import.meta.url), "utf8");
+  const content = await readFile(new URL(`./migrations/${migrationFile}`, import.meta.url), "utf8");
+  return content.replace(/\r\n/g, "\n");
 }
 
 async function orderMigrationsByJournal(migrationFiles: string[]): Promise<string[]> {

@@ -417,12 +417,13 @@ async function runVitest(args, label, testShard = null, exactFiles = false) {
   delete env.PAPERCLIP_CI_SELECTION_HASH;
   mkdirSync(env.PAPERCLIP_HOME, { recursive: true });
   mkdirSync(env.TMPDIR, { recursive: true });
+  const vitestCli = path.join(repoRoot, "node_modules", "vitest", "vitest.mjs");
   if (testShard) {
     const file = path.resolve(repoRoot, chatSuite);
     const sourceLines = readFileSync(file, "utf8").split("\n");
     const collect = (filters, name) => {
       const output = path.join(testRoot, `${name}.json`);
-      const result = spawnSync("pnpm", ["exec", "vitest", "list", ...sourceOnlyVitestArgs,
+      const result = spawnSync(process.execPath, [vitestCli, "list", ...sourceOnlyVitestArgs,
         ...filters, "--allowOnly=false", "--includeTaskLocation", `--json=${output}`], {
         cwd: repoRoot, env, stdio: "inherit",
       });
@@ -453,8 +454,8 @@ async function runVitest(args, label, testShard = null, exactFiles = false) {
     args = [...args.filter((arg) => arg !== chatSuite), ...runFilters, "--allowOnly=false"];
   }
   await new Promise((resolve, reject) => {
-    const command = exactFiles ? process.execPath : "pnpm";
-    const prefix = exactFiles ? [path.join(scriptsDir, "ci/run-selected-vitest.mjs")] : ["exec", "vitest", "run"];
+    const command = process.execPath;
+    const prefix = exactFiles ? [path.join(scriptsDir, "ci/run-selected-vitest.mjs")] : [vitestCli, "run"];
     const child = spawn(command, [...prefix, ...sourceOnlyVitestArgs, ...args], {
       cwd: repoRoot,
       env: invocationEnv("vitest", env),

@@ -58,6 +58,7 @@ import {
   readlinkSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -118,8 +119,17 @@ export function currentBuildId() {
   return String(process.ppid);
 }
 
-function finishingBuildIds() {
-  return [String(process.ppid), String(process.pid)];
+function finishingBuildIds(packageRoot) {
+  const ids = [String(process.ppid), String(process.pid)];
+  if (packageRoot) {
+    try {
+      const dir = buildInputsPendingDirectory(packageRoot);
+      const files = readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5));
+      files.sort((a, b) => statSync(path.join(dir, `${b}.json`)).mtimeMs - statSync(path.join(dir, `${a}.json`)).mtimeMs);
+      ids.push(...files);
+    } catch {}
+  }
+  return ids;
 }
 
 function readPendingRecord(pendingPath) {
@@ -318,7 +328,7 @@ export function recordRunnerBuild({
   now = () => new Date(),
 }) {
   const stampPath = buildInputsStampPath(packageRoot);
-  const candidates = buildId === null ? finishingBuildIds() : [String(buildId)];
+  const candidates = buildId === null ? finishingBuildIds(packageRoot) : [String(buildId)];
   let pending = null;
   let pendingPath = null;
   for (const candidate of candidates) {
