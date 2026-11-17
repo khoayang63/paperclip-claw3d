@@ -2896,8 +2896,6 @@ export function RetroOffice3D({
             isError:
               renderAgent?.status === "error" || agent.status === "error",
             working:
-              renderAgent?.state === "sitting" ||
-              renderAgent?.state === "dancing" ||
               renderAgent?.status === "working" ||
               agent.status === "working",
           };
