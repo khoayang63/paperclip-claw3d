@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import {
   type ComponentProps,
+  Component,
+  type ReactNode,
   memo,
   Suspense,
   useCallback,
@@ -1079,15 +1081,7 @@ function useAgentTick(
       const effectiveStatus: OfficeAgent["status"] =
         agent.status === "error"
           ? "error"
-          : explicitMeetingHold ||
-              explicitDeskHold ||
-              explicitGymHold ||
-              explicitSmsBoothHold ||
-              explicitPhoneBoothHold ||
-              explicitQaHold ||
-              explicitGithubHold ||
-              agent.status === "working" ||
-              stickyUntil > now
+          : agent.status === "working" || explicitMeetingHold
             ? "working"
             : "idle";
 
@@ -2237,6 +2231,28 @@ const buildInitialFurnitureLayout = (
       ),
     ),
   );
+
+class EnvironmentErrorBoundary extends Component<{ fallback?: ReactNode; children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { fallback?: ReactNode; children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(err: unknown) {
+    console.warn("[RetroOffice3D] Environment failed to load, falling back to scene lights:", err);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? null;
+    }
+    return this.props.children;
+  }
+}
 
 export function RetroOffice3D({
   agents,
@@ -5273,10 +5289,12 @@ export function RetroOffice3D({
             {/* Wall pictures — procedural, no async loading. */}
             <SceneWallPictures showRemoteOffice={remoteOfficeEnabled} />
 
-            {/* Environment lighting — async, wrapped in its own Suspense so floor stays visible. */}
-            <Suspense fallback={null}>
-              <Environment preset="city" />
-            </Suspense>
+            {/* Environment lighting — async, wrapped in its own ErrorBoundary + Suspense so scene stays visible even if HDR fails */}
+            <EnvironmentErrorBoundary fallback={null}>
+              <Suspense fallback={null}>
+                <Environment files="/hdri/potsdamer_platz_1k.hdr" />
+              </Suspense>
+            </EnvironmentErrorBoundary>
 
             {/* Furniture models — each loads its GLB asynchronously. */}
             <Suspense fallback={null}>
@@ -5731,22 +5749,24 @@ export function RetroOffice3D({
                   onHover={isJanitor ? undefined : handleAgentHover}
                   onUnhover={isJanitor ? undefined : handleAgentUnhover}
                   onClick={isJanitor ? undefined : handleAgentClick}
+                  onSpeechBubbleClick={isJanitor ? undefined : (agentId) => onMonitorSelect?.(agentId)}
                   onContextMenu={isJanitor ? undefined : handleAgentContextMenu}
                   showSpeech={
                     isJanitor
                       ? false
                       : standupMeeting?.phase === "in_progress"
                         ? Boolean(standupSpeechTextByAgentId[agent.id])
-                        : speechAgentIds.has(agent.id) ||
-                          Boolean(streamingTextByAgentId[agent.id])
+                        : (speechAgentIds.has(agent.id) ||
+                            Boolean(streamingTextByAgentId[agent.id])) &&
+                          agent.status === "working"
                   }
                   speechText={
                     isJanitor
                       ? null
                       : standupMeeting?.phase === "in_progress"
                         ? (standupSpeechTextByAgentId[agent.id] ?? null)
-                        : (speechTextByAgentId[agent.id] ??
-                            streamingTextByAgentId[agent.id] ??
+                        : (streamingTextByAgentId[agent.id] ??
+                            speechTextByAgentId[agent.id] ??
                             null)
                   }
                   suppressSpeechBubble={
@@ -6387,15 +6407,15 @@ export function RetroOffice3D({
             {activeMonitor ? (
               <MonitorImmersiveOverlay monitor={activeMonitor} />
             ) : null}
-            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-emerald-300/6" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-emerald-300/6" />
             <div
-              className="absolute inset-0 opacity-[0.08]"
+              className="pointer-events-none absolute inset-0 opacity-[0.08]"
               style={{
                 backgroundImage:
                   "repeating-linear-gradient(to bottom, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 1px, transparent 2px, transparent 4px)",
               }}
             />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.22)_100%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.22)_100%)]" />
           </div>
           <div className="absolute bottom-[3.1vh] left-1/2 h-[1.2vh] w-[12vw] -translate-x-1/2 rounded-full bg-[#0d0d0d] shadow-[0_0_0_1px_rgba(90,90,90,0.5)]" />
           <div className="absolute bottom-[1.1vh] left-1/2 h-[2vh] w-[20vw] -translate-x-1/2 rounded-[999px] bg-[#101010] shadow-[0_0_0_1px_rgba(82,82,82,0.5)]" />

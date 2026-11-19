@@ -340,6 +340,19 @@ export const planRuntimeAgentEvent = (
           timestampMs: nowMs,
         });
       }
+      const summary =
+        typeof data?.summary === "string" ? data.summary.trim() : "";
+      if (summary) {
+        commands.push({
+          kind: "queueAgentPatch",
+          patch: {
+            status: "running",
+            ...(runId ? { runId } : {}),
+            lastActivityAt: nowMs,
+            streamText: summary,
+          },
+        });
+      }
       return { commands };
     }
 

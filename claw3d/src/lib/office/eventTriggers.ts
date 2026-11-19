@@ -1115,7 +1115,7 @@ export const reconcileOfficeAnimationTriggerState = (params: {
 
   for (const agent of params.agents) {
     const agentId = agent.agentId;
-    const isAgentRunning = agent.status === "running" || Boolean(agent.runId);
+    const isAgentRunning = agent.status === "running";
     if (isAgentRunning) {
       workingUntilByAgentId = recordWorkingActivity(
         workingUntilByAgentId,
@@ -1172,12 +1172,13 @@ export const reconcileOfficeAnimationTriggerState = (params: {
       const suppressedKey =
         next.suppressedQaDirectiveKeyByAgentId[agentId] ?? "";
       if (
+        isAgentRunning &&
         qaDirective.directive !== "release" &&
         suppressedKey !== qaDirective.key
       ) {
         qaHoldByAgentId[agentId] = true;
       }
-    } else if (next.qaHoldByAgentId[agentId]) {
+    } else if (isAgentRunning && next.qaHoldByAgentId[agentId]) {
       qaHoldByAgentId[agentId] = true;
     }
 

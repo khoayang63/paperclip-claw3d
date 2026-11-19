@@ -233,6 +233,7 @@ const resolveOfficeQaDirectiveFromNormalized = (
     /\bclose\s+(?:the\s+)?qa\s+(?:room|lab)\b/,
     /\bdone\s+(?:testing|verifying|reproducing)\b/,
     /\bstop\s+(?:testing|verifying|reproducing)\b/,
+    /\b(?:all\s+agents\s+idle|done|feature\s+complete|milestone\s+closed|verified\s+resolved)\b/,
   ];
 
   if (qaReleasePatterns.some((pattern) => pattern.test(normalized))) {
@@ -601,9 +602,12 @@ export const reduceOfficeGymHoldState = (params: {
 
 export const reduceOfficeQaHoldState = (params: {
   currentHeld: boolean;
+  isAgentRunning?: boolean;
   lastUserMessage: string | null | undefined;
   transcriptEntries: TranscriptEntry[] | undefined;
 }): boolean => {
+  if (params.isAgentRunning === false) return false;
+
   const latestMessageDirective = resolveOfficeQaDirective(
     params.lastUserMessage,
   );

@@ -16,6 +16,8 @@ export type OfficeDeskMonitorEntry = {
   kind: "user" | "assistant" | "thinking" | "tool";
   text: string;
   live?: boolean;
+  timestamp?: number;
+  timeStr?: string;
 };
 
 export type OfficeDeskMonitor = {
@@ -42,7 +44,7 @@ const URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
 const DOMAIN_RE =
   /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s<>"'`]*)?\b/gi;
 const PATH_RE =
-  /(?:^|[\s("'`])((?:src|app|components|pages|lib|tests|server|scripts)\/[^\s)"'`]+?\.(?:ts|tsx|js|jsx|html|css|json|md))/g;
+  /(?:^|[\s("'`])((?:(?:src|app|components|pages|lib|tests|server|scripts|doc)\/)?[a-zA-Z0-9_.-]+\.(?:ts|tsx|js|jsx|html|css|json|md))/gi;
 const CODE_FENCE_RE = /```([a-z0-9_+-]+)?\n([\s\S]*?)```/i;
 const BROWSER_KEYWORD_RE =
   /\b(browser|navigate|snapshot|screenshot|tab|click|console|cookies|storage|page|url)\b/i;
@@ -51,25 +53,61 @@ const BROWSER_INTENT_RE =
 const MONITOR_HISTORY_LINE_LIMIT = 160;
 const MONITOR_BROWSER_SCAN_ENTRY_LIMIT = 18;
 
+const NON_BROWSER_URL_PATTERNS = [
+  /github\.com/i,
+  /gitlab\.com/i,
+  /bitbucket\.org/i,
+  /\.git(\/|\?|#|$)/i,
+  /npmjs\.com/i,
+];
+
+const isRealBrowserUrl = (url: string | null): boolean => {
+  if (!url) return false;
+  if (NON_BROWSER_URL_PATTERNS.some((pat) => pat.test(url))) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 const extractUrls = (value: string): string[] => {
+  if (
+    !BROWSER_KEYWORD_RE.test(value) &&
+    !BROWSER_INTENT_RE.test(value) &&
+    !/localhost|127\.0\.0\.1/i.test(value)
+  ) {
+    return [];
+  }
   const matches = value.match(URL_RE);
-  return matches ? matches.map((entry) => entry.trim()) : [];
+  return matches ? matches.map((entry) => entry.trim()).filter(isRealBrowserUrl) : [];
 };
 
 const normalizeBrowserUrl = (value: string): string | null => {
   const trimmed = value.trim().replace(/[.,;!?]+$/g, "");
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (!trimmed.includes(".") || /\s/.test(trimmed)) return null;
-  return `https://${trimmed}`;
+  if (NON_BROWSER_URL_PATTERNS.some((pat) => pat.test(trimmed))) return null;
+  let candidate = trimmed;
+  if (!/^https?:\/\//i.test(candidate)) {
+    if (!candidate.includes(".") || /\s/.test(candidate)) return null;
+    candidate = `https://${candidate}`;
+  }
+  return isRealBrowserUrl(candidate) ? candidate : null;
 };
 
 const extractDomains = (value: string): string[] => {
   const matches = value.match(DOMAIN_RE);
-  return matches ? matches.map((entry) => entry.trim()) : [];
+  return matches ? matches.map((entry) => entry.trim()).filter(isRealBrowserUrl) : [];
 };
 
 const extractPath = (value: string): string | null => {
+  const editMatch = value.match(
+    /Editing\s+[`'"]?([a-zA-Z0-9_.\-\/\s]+?\.(?:ts|tsx|js|jsx|html|css|json|md))(?::|[`'"]|\s|$)/i,
+  );
+  if (editMatch) {
+    return editMatch[1].replace(/\s+/g, "").trim();
+  }
   const match = value.match(PATH_RE);
   if (!match || match.length === 0) return null;
   const last = match[match.length - 1];
@@ -91,9 +129,13 @@ const flattenMonitorEntry = (item: AgentChatItem): OfficeDeskMonitorEntry | null
         })()
       : normalizeEntryText(item.text);
   if (!text) return null;
+  const timestamp = "timestampMs" in item && typeof item.timestampMs === "number" ? item.timestampMs : undefined;
+  const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString("vi-VN", { hour12: false }) : undefined;
   return {
     kind: item.kind,
     text,
+    timestamp,
+    timeStr,
     ...("live" in item && item.live ? { live: true } : {}),
   };
 };
@@ -299,7 +341,7 @@ export const buildOfficeDeskMonitor = (
   const flatEntries = chatItems
     .map(flattenMonitorEntry)
     .filter((entry): entry is OfficeDeskMonitorEntry => Boolean(entry));
-  const latestEntries = flatEntries.slice(-6);
+  const latestEntries = flatEntries.slice(-50);
   const browserScanEntries = flatEntries.slice(-MONITOR_BROWSER_SCAN_ENTRY_LIMIT);
   const browserUrl =
     [
@@ -335,6 +377,6 @@ export const buildOfficeDeskMonitor = (
       Boolean(agent.thinkingTrace) ||
       latestEntries.some((entry) => entry.live),
     entries: latestEntries,
-    editor: modeSummary.mode !== "browser" ? deriveEditorDocument({ agent, entries: flatEntries }) : null,
+    editor: deriveEditorDocument({ agent, entries: flatEntries }),
   };
 };

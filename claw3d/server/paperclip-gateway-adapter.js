@@ -21,8 +21,112 @@ let lastModelsFetchAt = 0;
 let lastPollAt = 0;
 
 const conversationHistory = new Map();
+const sessionSettings = new Map();
 const activeRuns = new Map();
 const activeSendEventFns = new Set();
+const liveAgentActivity = new Map(); // agentId -> { actionText, filePath, toolName, terminalLine, updatedAt }
+
+function extractFileBasename(rawPath) {
+  if (typeof rawPath !== "string" || !rawPath.trim()) return "";
+  const cleaned = rawPath.trim().replace(/\\/g, "/");
+  return cleaned.split("/").filter(Boolean).pop() || cleaned;
+}
+
+function describeToolAction(toolName, rawInput) {
+  const name = String(toolName || "tool").toLowerCase().trim();
+  const input = rawInput && typeof rawInput === "object" ? rawInput : {};
+  const filePath =
+    typeof input.filePath === "string"
+      ? input.filePath
+      : typeof input.file_path === "string"
+        ? input.file_path
+        : typeof input.path === "string"
+          ? input.path
+          : "";
+  const baseName = extractFileBasename(filePath);
+
+  if (name === "read" || name === "read_file" || name === "view_file") {
+    const label = baseName ? `Reading ${baseName}` : "Reading file";
+    return { actionText: label, filePath: filePath || null, terminalLine: `$ [read] ${baseName || filePath || "file"}` };
+  }
+
+  if (name === "edit" || name === "edit_file" || name === "patch" || name === "replace" || name === "multiedit") {
+    const label = baseName ? `Editing ${baseName}` : "Editing code";
+    return { actionText: label, filePath: filePath || null, terminalLine: `$ [edit] ${baseName || filePath || "file"}` };
+  }
+
+  if (name === "write" || name === "write_file" || name === "create_file") {
+    const label = baseName ? `Writing ${baseName}` : "Writing file";
+    return { actionText: label, filePath: filePath || null, terminalLine: `$ [write] ${baseName || filePath || "file"}` };
+  }
+
+  if (name === "grep" || name === "glob" || name === "search" || name === "find" || name === "list") {
+    const pattern = typeof input.pattern === "string" ? input.pattern.trim() : typeof input.query === "string" ? input.query.trim() : "";
+    const shortPat = pattern.length > 18 ? `${pattern.slice(0, 18)}…` : pattern;
+    const label = shortPat ? `Searching ${shortPat}` : "Searching codebase";
+    return { actionText: label, filePath: null, terminalLine: `$ [${name}] ${pattern || "."}` };
+  }
+
+  if (name === "bash" || name === "shell" || name === "exec" || name === "terminal" || name === "run_command") {
+    const rawCmd = typeof input.command === "string" ? input.command : typeof input.cmd === "string" ? input.cmd : "";
+    const firstLine = rawCmd
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l && !l.startsWith("#")) || "";
+
+    // Detect Paperclip API calls (comments, subtasks, status updates)
+    if (/\/api\/.*\/comments/i.test(rawCmd)) {
+      return { actionText: "Posting issue update", filePath: null, terminalLine: `$ [api] post issue comment` };
+    }
+    if (/\/api\/.*\/issues/i.test(rawCmd) && /POST|Method\s+Post/i.test(rawCmd)) {
+      return { actionText: "Creating subtask", filePath: null, terminalLine: `$ [api] create subtask` };
+    }
+    if (/\/api\/.*\/issues/i.test(rawCmd) && /PATCH|Method\s+Patch/i.test(rawCmd)) {
+      return { actionText: "Updating issue status", filePath: null, terminalLine: `$ [api] update issue status` };
+    }
+    if (/\/api\/.*\/checkout/i.test(rawCmd)) {
+      return { actionText: "Checking out task", filePath: null, terminalLine: `$ [api] checkout task` };
+    }
+
+    // Detect test commands
+    const testCmdMatch = rawCmd.match(/\b((?:npm|pnpm|yarn)\s+(?:run\s+)?test(?::[a-z0-9_-]+)?|node\s+--test[^\n;&|]*|npx\s+(?:vitest|jest|playwright)[^\n;&|]*|pytest[^\n;&|]*)/i);
+    if (testCmdMatch) {
+      const shortTest = testCmdMatch[1].replace(/\s+/g, " ").trim();
+      const display = shortTest.length > 26 ? `${shortTest.slice(0, 26)}…` : shortTest;
+      return { actionText: `Running ${display}`, filePath: null, terminalLine: `$ ${shortTest.slice(0, 90)}` };
+    }
+
+    // Detect git commands
+    const gitMatch = rawCmd.match(/\b(git\s+[a-z-]+(?:\s+[^\n;&|]{0,24})?)/i);
+    if (gitMatch) {
+      const shortGit = gitMatch[1].replace(/\s+/g, " ").trim();
+      const display = shortGit.length > 26 ? `${shortGit.slice(0, 26)}…` : shortGit;
+      return { actionText: `Running ${display}`, filePath: null, terminalLine: `$ ${shortGit.slice(0, 90)}` };
+    }
+
+    // Detect node/python script execution
+    const cleaned = firstLine
+      .replace(/^(?:cd\s+[^;&|]+(?:&&|;)\s*)+/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const shortCmd = cleaned.length > 26 ? `${cleaned.slice(0, 26)}…` : cleaned;
+    return {
+      actionText: shortCmd ? `Running ${shortCmd}` : "Running terminal command",
+      filePath: null,
+      terminalLine: `$ ${(cleaned || firstLine || "bash").slice(0, 90)}`,
+    };
+  }
+
+  if (name === "webfetch" || name === "websearch" || name === "browser") {
+    return { actionText: "Browsing web", filePath: null, terminalLine: `$ [${name}] fetching resource` };
+  }
+
+  if (name === "task" || name === "subagent" || name === "todowrite") {
+    return { actionText: name === "todowrite" ? "Updating task plan" : "Delegating subtask", filePath: null, terminalLine: `$ [${name}]` };
+  }
+
+  return { actionText: `Using ${toolName}`, filePath: filePath || null, terminalLine: `$ [${name}]` };
+}
 
 function randomId() {
   return randomUUID().replace(/-/g, "");
@@ -130,132 +234,252 @@ async function syncPaperclipIssues() {
   return cachedIssues;
 }
 
-function getAgentContext(agentId) {
+const agentContextCache = new Map();
+
+async function getAgentContext(agentId) {
+  const cached = agentContextCache.get(agentId);
+  if (cached && Date.now() - cached.ts < 3500) {
+    return cached.data;
+  }
+
   const agent = cachedAgents.find((a) => a.id === agentId);
   const roleName = ((agent?.name || "") + " " + (agent?.role || "")).toLowerCase();
   const agentIssues = cachedIssues.filter((i) => i.assigneeAgentId === agentId);
-  const activeIssue = agentIssues.find((i) => i.status === "in_progress") || agentIssues[0] || cachedIssues[0];
+  const inProgressIssue = agentIssues.find((i) => i.status === "in_progress");
   const isRunning = cachedLiveRuns.some((r) => r.agentId === agentId);
+  const isAgentActive = Boolean(inProgressIssue || isRunning);
+  const activeIssue = inProgressIssue || agentIssues[0] || cachedIssues[0];
 
-  // Check QA first so "QA & Test Engineer" is not mistaken for a developer
-  if (roleName.includes("qa") || roleName.includes("test")) {
-    return {
-      fileName: "tests/a11y-audit.spec.js",
-      language: "javascript",
-      taskTitle: activeIssue ? `${activeIssue.identifier}: ${activeIssue.title}` : "PTI-5: QA re-verify",
-      taskDesc: "Run end-to-end audit for a11y D1-D5 defects and regression smoke.",
-      codeSnippet: `// tests/a11y-audit.spec.js - Verification Suite
-describe("A11y Defect Re-verification (PTI-5)", () => {
-  test("D1: Primary button contrast >= 4.5:1 in dark mode", async () => {
-    const contrast = await measureContrast(".btn-primary", "dark");
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
-  });
+  const companyId = await getActiveCompanyId();
 
-  test("D2: Unselected tag chips contrast >= 4.5:1 in both themes", async () => {
-    const contrast = await measureContrast(".tag-chip.unselected", "light");
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
-  });
-
-  test("D4 & D5: Keyboard focus preserved on toggle and edit save", async () => {
-    await simulateKeyAction("toggle-task-1");
-    expect(getActiveElementId()).toBe("todo-checkbox-1");
-  });
-});`,
-      terminalLines: [
-        "$ npx playwright test tests/a11y-audit.spec.js",
-        "$ checking D1-D3 contrast ratios (dark/light themes)",
-        "$ checking D4-D5 keyboard focus restoration on toggle & edit",
-        "$ 61 PASS / 0 FAIL - all a11y defects verified resolved",
-        "$ test suite verdict: PASS",
-      ],
-      status: activeIssue?.status || (isRunning ? "in_progress" : "done"),
-    };
-  }
-
-  if (roleName.includes("full-stack") || roleName.includes("dev") || roleName.includes("engineer") || roleName.includes("developer")) {
-    let realCode = "";
+  // 1. Resolve workspace directory dynamically from Paperclip API
+  let workspaceDir = null;
+  if (activeIssue?.id) {
     try {
-      const codePath = path.join(
-        process.env.USERPROFILE || "C:\\Users\\OS",
-        ".paperclip",
-        "instances",
-        "default",
-        "isolated-workspaces",
-        "d3656933-1767-4474-a462-434035973bd1",
-        "7bc9bb59-9fcf-4db8-bb3f-7948c2715f7d",
-        "repo",
-        "app.js"
-      );
-      if (fs.existsSync(codePath)) {
-        const lines = fs.readFileSync(codePath, "utf8").split("\n").slice(0, 45);
-        realCode = lines.join("\n");
+      const wsRes = await fetchPaperclipJson(`/issues/${activeIssue.id}/workspace`);
+      if (wsRes?.workspace?.cwd && fs.existsSync(wsRes.workspace.cwd)) {
+        workspaceDir = wsRes.workspace.cwd;
       }
     } catch {}
-
-    if (!realCode) {
-      realCode = `// src/app.js - Todo App v2 Implementation
-function calculateOverdue(dueDate) {
-  if (!dueDate) return false;
-  const endOfDay = new Date(dueDate);
-  endOfDay.setHours(23, 59, 59, 999);
-  return Date.now() > endOfDay.getTime();
-}
-
-function exportTasksToJson() {
-  const data = {
-    version: "2.0",
-    exportedAt: new Date().toISOString(),
-    tasks: getStoredTasks(),
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = \`todo-backup-\${Date.now()}.json\`;
-  a.click();
-}
-
-function renderTagChips(tags) {
-  return tags.map(t => \`<span class="tag-chip tag-\${t.color}">\${t.name}</span>\`).join(" ");
-}`;
-    }
-
-    return {
-      fileName: "src/app.js",
-      language: "javascript",
-      taskTitle: activeIssue ? `${activeIssue.identifier}: ${activeIssue.title}` : "PTI-4: Dev fix",
-      taskDesc: "Fix a11y contrast and keyboard focus defects in Todo repository.",
-      codeSnippet: realCode,
-      terminalLines: [
-        "$ git checkout -b fix/a11y-defects",
-        "$ git add app.js styles.css README.md",
-        '$ git commit -m "Fix a11y contrast and keyboard focus defects"',
-        "$ git push origin main [f70239e]",
-      ],
-      status: activeIssue?.status || (isRunning ? "in_progress" : "done"),
-    };
   }
 
-  // CEO / Other
-  return {
-    fileName: "doc/todo-roadmap.md",
-    language: "markdown",
-    taskTitle: activeIssue ? `${activeIssue.identifier}: ${activeIssue.title}` : "PTI-1: Build Todo App",
-    taskDesc: "Manage and coordinate Todo App development and QA verification.",
-    codeSnippet: `# Todo App v2 Roadmap & Execution Plan
-1. Dev (PTI-2): Implement Due Dates, Colored Tags, JSON Export/Import in qldapm-1 repo. [DONE]
-2. QA (PTI-3): Comprehensive verification, regression checks, day-rollover. [DONE]
-3. Dev (PTI-4): Fix a11y contrast and keyboard focus defects. [DONE]
-4. QA (PTI-5): Re-verify a11y fixes and regression smoke. [IN_PROGRESS]
-5. Release: Verify QA verdict, and close milestone PTI-1.`,
-    terminalLines: [
-      "$ paperclip issue list --status in_progress",
-      "$ paperclip issue view PTI-4 [DONE: commit f70239e]",
-      "$ paperclip issue view PTI-5 [IN_PROGRESS]",
-      "$ awaiting QA sign-off to close milestone PTI-1",
-    ],
-    status: activeIssue?.status || (isRunning ? "in_progress" : "idle"),
+  if (!workspaceDir && companyId && activeIssue?.id) {
+    const candidate = path.join(
+      process.env.USERPROFILE || "",
+      ".paperclip",
+      "instances",
+      "default",
+      "isolated-workspaces",
+      companyId,
+      activeIssue.id
+    );
+    if (fs.existsSync(candidate)) {
+      workspaceDir = candidate;
+    }
+  }
+
+  if (workspaceDir && fs.existsSync(path.join(workspaceDir, "repo"))) {
+    workspaceDir = path.join(workspaceDir, "repo");
+  }
+
+  // 2. Scan workspace files dynamically
+  let foundFiles = [];
+  if (workspaceDir && fs.existsSync(workspaceDir)) {
+    try {
+      function scanDir(dir, depth = 0) {
+        if (depth > 2) return;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isFile()) {
+            const relPath = path.relative(workspaceDir, fullPath).replace(/\\/g, "/");
+            foundFiles.push({ name: entry.name, relativePath: relPath, fullPath });
+          } else if (entry.isDirectory()) {
+            scanDir(fullPath, depth + 1);
+          }
+        }
+      }
+      scanDir(workspaceDir);
+    } catch {}
+  }
+
+  // Fallback to Paperclip file-resources API if local filesystem scan found nothing
+  if (foundFiles.length === 0 && activeIssue?.id) {
+    try {
+      const listRes = await fetchPaperclipJson(`/issues/${activeIssue.id}/file-resources/list?path=repo`);
+      if (Array.isArray(listRes?.items)) {
+        foundFiles = listRes.items
+          .filter((it) => it.kind === "file")
+          .map((it) => ({
+            name: it.title,
+            relativePath: it.relativePath,
+            fullPath: null,
+          }));
+      }
+    } catch {}
+  }
+
+  // 3. Select the best file for this agent (prefer real active file from live tool calls first!)
+  let targetFile = null;
+  const liveActivity = liveAgentActivity.get(agentId) || null;
+  if (isAgentActive && liveActivity?.filePath) {
+    const normalizedLive = liveActivity.filePath.replace(/\\/g, "/").toLowerCase();
+    const liveBase = extractFileBasename(liveActivity.filePath).toLowerCase();
+    targetFile =
+      foundFiles.find((f) => f.fullPath && f.fullPath.replace(/\\/g, "/").toLowerCase() === normalizedLive) ||
+      foundFiles.find((f) => f.relativePath.toLowerCase() === normalizedLive) ||
+      foundFiles.find((f) => f.name.toLowerCase() === liveBase) ||
+      (fs.existsSync(liveActivity.filePath)
+        ? {
+            name: extractFileBasename(liveActivity.filePath),
+            relativePath:
+              workspaceDir && liveActivity.filePath.toLowerCase().startsWith(workspaceDir.toLowerCase())
+                ? path.relative(workspaceDir, liveActivity.filePath).replace(/\\/g, "/")
+                : extractFileBasename(liveActivity.filePath),
+            fullPath: liveActivity.filePath,
+          }
+        : null);
+  }
+  if (!targetFile) {
+    if (roleName.includes("qa") || roleName.includes("test")) {
+      targetFile =
+        foundFiles.find((f) => /\.spec\.|\.test\.|a11y/i.test(f.name)) ||
+        foundFiles.find((f) => /\.(js|ts|jsx|tsx)$/i.test(f.name));
+    } else if (roleName.includes("dev") || roleName.includes("engineer") || roleName.includes("code")) {
+      targetFile =
+        foundFiles.find((f) => /\.(js|ts|jsx|tsx|css|html|py)$/i.test(f.name) && !/\.spec\.|\.test\./i.test(f.name)) ||
+        foundFiles.find((f) => /\.(js|ts|jsx|tsx)$/i.test(f.name));
+    } else {
+      targetFile =
+        foundFiles.find((f) => /\.(md|markdown|txt|json)$/i.test(f.name)) ||
+        foundFiles[0];
+    }
+  }
+
+  if (!targetFile && foundFiles.length > 0) {
+    targetFile = foundFiles[0];
+  }
+
+  // 4. Read real file content
+  let realCode = "";
+  const resolvedFileName = targetFile ? targetFile.relativePath : "workbench.js";
+  if (targetFile?.fullPath && fs.existsSync(targetFile.fullPath)) {
+    try {
+      realCode = fs.readFileSync(targetFile.fullPath, "utf8");
+    } catch {}
+  } else if (targetFile?.relativePath && activeIssue?.id) {
+    try {
+      const fileContentRes = await fetchPaperclipJson(
+        `/issues/${activeIssue.id}/file-resources/content?path=${encodeURIComponent(targetFile.relativePath)}`
+      );
+      if (fileContentRes?.content?.data) {
+        realCode = fileContentRes.content.data;
+      }
+    } catch {}
+  }
+
+  if (!realCode) {
+    realCode = `// ${resolvedFileName}\n// Task: ${activeIssue ? activeIssue.identifier + " - " + activeIssue.title : "Ready"}\n// Status: ${activeIssue ? activeIssue.status : "idle"}\n`;
+  }
+
+  // 5. Language detection
+  const ext = path.extname(resolvedFileName).toLowerCase();
+  const languageMap = {
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".css": "css",
+    ".html": "html",
+    ".json": "json",
+    ".md": "markdown",
+    ".py": "python",
+    ".sh": "bash",
   };
+  const language = languageMap[ext] || "javascript";
+
+  // 6. Dynamic terminal lines from real heartbeat run logs (formatted cleanly from OpenCode NDJSON)
+  let terminalLines = [];
+  if (companyId) {
+    try {
+      const runs = await fetchPaperclipJson(`/companies/${companyId}/heartbeat-runs?limit=10`);
+      const agentRun = (Array.isArray(runs) ? runs : []).find((r) => r.agentId === agentId);
+      if (agentRun) {
+        const totalBytes = Number(agentRun.lastOutputBytes || agentRun.logBytes || 0);
+        const offset = totalBytes > 200000 ? totalBytes - 200000 : 0;
+        const logRes = await fetchPaperclipJson(`/heartbeat-runs/${agentRun.id}/log?offset=${offset}&limitBytes=262144`);
+        if (logRes?.content) {
+          const parsedLines = [];
+          for (const rawLine of logRes.content.split("\n")) {
+            if (!rawLine.trim()) continue;
+            try {
+              const obj = JSON.parse(rawLine);
+              if (obj.chunk) {
+                for (const c of obj.chunk.split(/\r?\n/)) {
+                  const trimmed = c.trim();
+                  if (!trimmed || trimmed.includes("[paperclip] Failed to inject")) continue;
+                  if (trimmed.startsWith("{")) {
+                    try {
+                      const ev = JSON.parse(trimmed);
+                      const tsNum = typeof ev.timestamp === "number" ? ev.timestamp : (obj.ts ? new Date(obj.ts).getTime() : null);
+                      const timeStr = tsNum ? new Date(tsNum).toLocaleTimeString("vi-VN", { hour12: false }) : null;
+                      const timePrefix = timeStr ? `[${timeStr}] ` : "";
+
+                      if (ev.type === "tool_use" && ev.part?.tool) {
+                        const described = describeToolAction(ev.part.tool, ev.part.state?.input);
+                        if (described.terminalLine) parsedLines.push(`${timePrefix}${described.terminalLine}`);
+                      } else if (ev.type === "text" && typeof ev.part?.text === "string" && ev.part.text.trim()) {
+                        const first = ev.part.text.trim().split(/\r?\n/)[0].slice(0, 90);
+                        if (first) parsedLines.push(`${timePrefix}> ${first}`);
+                      }
+                    } catch {}
+                  } else {
+                    parsedLines.push(trimmed.startsWith("$") ? trimmed : `$ ${trimmed.slice(0, 100)}`);
+                  }
+                }
+              }
+            } catch {}
+          }
+          if (parsedLines.length > 0) {
+            terminalLines = parsedLines.slice(-50);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (terminalLines.length === 0) {
+    if (activeIssue) {
+      terminalLines = [
+        `$ paperclip issue view ${activeIssue.identifier}`,
+        `$ task: ${activeIssue.title}`,
+        `$ status: ${activeIssue.status}`,
+        isAgentActive ? `$ agent running task ${activeIssue.identifier}...` : `$ standing by for next task`,
+      ];
+    } else {
+      terminalLines = [
+        `$ paperclip agent status`,
+        `$ status: idle`,
+        `$ ready for tasks`,
+      ];
+    }
+  }
+
+  const result = {
+    fileName: resolvedFileName,
+    language,
+    taskTitle: activeIssue ? `${activeIssue.identifier}: ${activeIssue.title}` : "Ready for tasks",
+    taskDesc: activeIssue?.description ? activeIssue.description.slice(0, 160) : "Standing by for instructions.",
+    codeSnippet: realCode,
+    terminalLines,
+    status: activeIssue?.status || (isRunning ? "in_progress" : "done"),
+    isAgentActive,
+    actionText: isAgentActive && liveActivity?.actionText ? liveActivity.actionText : null,
+  };
+
+  agentContextCache.set(agentId, { ts: Date.now(), data: result });
+  return result;
 }
 
 async function fetchPaperclipModels() {
@@ -360,7 +584,8 @@ async function handleMethod(method, params, id, sendEvent) {
         const sessionKey = sessionKeyFor(agent.id);
         const history = getHistory(sessionKey);
         const isRunning = cachedLiveRuns.some((r) => r.agentId === agent.id);
-        const agentModel = agent.model || "google/gemini-3.6-flash";
+        const currentSetting = sessionSettings.get(sessionKey);
+        const agentModel = currentSetting?.model || agent.model || "google/gemini-3.6-flash";
         const provider = agentModel.includes("/") ? agentModel.split("/")[0] : "paperclip";
         return {
           key: sessionKey,
@@ -370,6 +595,7 @@ async function handleMethod(method, params, id, sendEvent) {
           origin: { label: agent.name, provider: "paperclip" },
           model: agentModel,
           modelProvider: provider,
+          thinkingLevel: currentSetting?.thinkingLevel || null,
         };
       });
       return resOk(id, { sessions });
@@ -380,46 +606,65 @@ async function handleMethod(method, params, id, sendEvent) {
       const keys = Array.isArray(p.keys) ? p.keys : [];
       const limit = typeof p.limit === "number" ? p.limit : 8;
       const maxChars = typeof p.maxChars === "number" ? p.maxChars : 600;
-      const previews = keys.map((key) => {
-        const match = key.match(/^agent:([^:]+):/);
-        const agentId = match ? match[1] : null;
-        if (agentId) {
-          const ctx = getAgentContext(agentId);
-          return {
-            key,
-            status: "ok",
-            items: [
-              {
-                role: "user",
-                text: `${ctx.taskTitle}: ${ctx.taskDesc}`,
-                timestamp: Date.now() - 120000,
-              },
-              {
-                role: "assistant",
-                text: `Editing \`${ctx.fileName}\`:\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n${ctx.terminalLines.join("\n")}`,
-                timestamp: Date.now(),
-              },
-            ],
-          };
-        }
-        const history = getHistory(key);
-        if (history.length === 0) return { key, status: "empty", items: [] };
-        const items = history.slice(-limit).map((msg) => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
-          text: String(msg.content || "").slice(0, maxChars),
-          timestamp: Date.now(),
-        }));
-        return { key, status: "ok", items };
-      });
+      const previews = await Promise.all(
+        keys.map(async (key) => {
+          const match = key.match(/^agent:([^:]+):/);
+          const agentId = match ? match[1] : null;
+          if (agentId) {
+            const ctx = await getAgentContext(agentId);
+            return {
+              key,
+              status: "ok",
+              items: [
+                {
+                  role: "user",
+                  text: `${ctx.taskTitle}: ${ctx.taskDesc}`,
+                  timestamp: Date.now() - 120000,
+                },
+                {
+                  role: "assistant",
+                  text: ctx.isAgentActive
+                    ? `${ctx.actionText || `Editing \`${ctx.fileName}\``}:\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n${ctx.terminalLines.join("\n")}`
+                    : `Standing by. Ready for tasks.\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n${ctx.terminalLines.join("\n")}`,
+                  timestamp: Date.now(),
+                },
+              ],
+            };
+          }
+          const history = getHistory(key);
+          if (history.length === 0) return { key, status: "empty", items: [] };
+          const items = history.slice(-limit).map((msg) => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            text: String(msg.content || "").slice(0, maxChars),
+            timestamp: Date.now(),
+          }));
+          return { key, status: "ok", items };
+        })
+      );
+      if (knownActiveRuns.size > 0 && typeof sendEvent === "function") {
+        setTimeout(() => replayActiveRunsToClient(sendEvent), 350);
+      }
       return resOk(id, { ts: Date.now(), previews });
     }
 
-    case "sessions.patch":
+    case "sessions.patch": {
+      const key = typeof p.key === "string" ? p.key : "";
+      if (key) {
+        const current = sessionSettings.get(key) || {};
+        if (p.model !== undefined) current.model = p.model || null;
+        if (p.thinkingLevel !== undefined) current.thinkingLevel = p.thinkingLevel || null;
+        sessionSettings.set(key, current);
+        console.log(`[GatewayAdapter] Updated session settings for ${key}:`, current);
+      }
       return resOk(id, { ok: true });
+    }
 
     case "sessions.reset": {
       const key = typeof p.key === "string" ? p.key : "";
-      if (key) conversationHistory.delete(key);
+      if (key) {
+        conversationHistory.delete(key);
+        sessionSettings.delete(key);
+      }
       return resOk(id, { ok: true });
     }
 
@@ -432,23 +677,53 @@ async function handleMethod(method, params, id, sendEvent) {
       const runId = typeof p.idempotencyKey === "string" && p.idempotencyKey ? p.idempotencyKey : randomId();
       if (!message) return resOk(id, { status: "no-op", runId });
 
+      // Build model & reasoning effort override if configured for this session
+      const sessionSetting = sessionSettings.get(sessionKey);
+      let assigneeAdapterOverrides = null;
+      if (sessionSetting && sessionSetting.model) {
+        const adapterConfig = {
+          model: sessionSetting.model,
+        };
+        if (sessionSetting.thinkingLevel) {
+          const adapterType = agent?.adapterType || "opencode_local";
+          if (adapterType === "opencode_local") {
+            adapterConfig.variant = sessionSetting.thinkingLevel;
+          } else if (adapterType === "codex_local" || adapterType === "paperclip_runner") {
+            adapterConfig.modelReasoningEffort = sessionSetting.thinkingLevel;
+          } else if (adapterType === "claude_local" || adapterType === "kimi_local") {
+            adapterConfig.effort = sessionSetting.thinkingLevel;
+          } else if (adapterType === "grok_local") {
+            adapterConfig.reasoningEffort = sessionSetting.thinkingLevel;
+          } else if (adapterType === "pi_local") {
+            adapterConfig.thinking = sessionSetting.thinkingLevel;
+          }
+        }
+        assigneeAdapterOverrides = { adapterConfig };
+        console.log(`[GatewayAdapter] Forwarding task to Paperclip with model override for ${agent?.name}:`, assigneeAdapterOverrides);
+      }
+
       // Forward task/instruction to Paperclip if applicable
       const companyId = await getActiveCompanyId();
       let paperclipIssueCreated = null;
       if (companyId) {
+        const payload = {
+          title: `Task for ${agent?.name || "Agent"}: ${message.slice(0, 80)}`,
+          description: message,
+          assigneeAgentId: agentId,
+        };
+        if (assigneeAdapterOverrides) {
+          payload.assigneeAdapterOverrides = assigneeAdapterOverrides;
+        }
         paperclipIssueCreated = await fetchPaperclipJson(`/companies/${companyId}/issues`, {
           method: "POST",
-          body: JSON.stringify({
-            title: `Task for ${agent?.name || "Agent"}: ${message.slice(0, 80)}`,
-            description: message,
-            assigneeAgentId: agentId,
-          }),
+          body: JSON.stringify(payload),
         });
       }
 
+      const modelNote = sessionSetting?.model ? ` [Model: ${sessionSetting.model}]` : "";
       const reply = paperclipIssueCreated
-        ? `[Paperclip Issue #${paperclipIssueCreated.identifier || "NEW"}] Received by ${agent.name}. Dispatching workflow execution...`
-        : `[${agent.name}] Received: "${message}". Coordinating with Paperclip control plane.`;
+        ? `[Paperclip Issue #${paperclipIssueCreated.identifier || "NEW"}] Received by ${agent.name}${modelNote}. Dispatching workflow execution...`
+        : `[${agent.name}] Received: "${message}"${modelNote}. Coordinating with Paperclip control plane.`;
 
       let aborted = false;
       activeRuns.set(runId, {
@@ -526,12 +801,14 @@ async function handleMethod(method, params, id, sendEvent) {
       const agentId = match ? match[1] : null;
       const history = getHistory(sessionKey);
       if (agentId) {
-        const ctx = getAgentContext(agentId);
+        const ctx = await getAgentContext(agentId);
         const dynamicMessages = [
           { role: "user", content: `${ctx.taskTitle}\n\n${ctx.taskDesc}` },
           {
             role: "assistant",
-            content: `Editing \`${ctx.fileName}\`:\n\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n\n${ctx.terminalLines.join("\n")}`,
+            content: ctx.isAgentActive
+              ? `${ctx.actionText || `Editing \`${ctx.fileName}\``}:\n\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n\n${ctx.terminalLines.join("\n")}`
+              : `Standing by. Ready for tasks.\n\n\`\`\`${ctx.language || "javascript"}\n${ctx.codeSnippet}\n\`\`\`\n\n${ctx.terminalLines.join("\n")}`,
           },
         ];
         return resOk(id, {
@@ -586,6 +863,199 @@ async function handleMethod(method, params, id, sendEvent) {
 // Paperclip Polling & Lifecycle Bridge
 // ---------------------------------------------------------------------------
 const knownActiveRuns = new Map();
+const runLogState = new Map(); // runId -> { offset: number, recentEvents: Array<object> }
+
+function compactToolInput(toolName, rawInput) {
+  if (!rawInput || typeof rawInput !== "object") return rawInput ?? {};
+  const out = {};
+  for (const [k, v] of Object.entries(rawInput)) {
+    if (k === "content" && typeof v === "string" && v.length > 120) {
+      out[k] = `${v.slice(0, 100)}… (${v.length} chars)`;
+    } else if ((k === "oldString" || k === "newString") && typeof v === "string" && v.length > 100) {
+      out[k] = `${v.slice(0, 80)}…`;
+    } else if (typeof v === "string" && v.length > 220) {
+      out[k] = `${v.slice(0, 220)}…`;
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function parseLogChunkToAgentEvents(runId, agentId, content, skipFirstPartialLine) {
+  const sessionKey = sessionKeyFor(agentId);
+  const lines = content.split(/\r?\n/);
+  const startIdx = skipFirstPartialLine ? 1 : 0;
+  const frames = [];
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) continue;
+    let outer;
+    try {
+      outer = JSON.parse(rawLine);
+    } catch {
+      continue;
+    }
+    if (outer.stream !== "stdout" || typeof outer.chunk !== "string") continue;
+
+    for (const chunkLine of outer.chunk.split(/\r?\n/)) {
+      const trimmed = chunkLine.trim();
+      if (!trimmed.startsWith("{")) continue;
+      let ev;
+      try {
+        ev = JSON.parse(trimmed);
+      } catch {
+        continue;
+      }
+
+      if (ev.type === "reasoning" && typeof ev.part?.text === "string" && ev.part.text.trim()) {
+        frames.push({
+          type: "event",
+          event: "agent",
+          payload: {
+            runId,
+            sessionKey,
+            stream: "thinking",
+            data: { text: ev.part.text.trim().slice(0, 500) },
+          },
+        });
+      } else if (ev.type === "tool_use" && ev.part?.tool) {
+        const toolName = String(ev.part.tool);
+        const callId = typeof ev.part.callID === "string" ? ev.part.callID : randomId();
+        const input = compactToolInput(toolName, ev.part.state?.input);
+        const described = describeToolAction(toolName, ev.part.state?.input);
+        const prev = liveAgentActivity.get(agentId);
+        liveAgentActivity.set(agentId, {
+          actionText: described.actionText,
+          filePath: described.filePath || prev?.filePath || null,
+          toolName,
+          terminalLine: described.terminalLine,
+          updatedAt: Date.now(),
+        });
+        agentContextCache.delete(agentId);
+        frames.push({
+          type: "event",
+          event: "agent",
+          payload: {
+            runId,
+            sessionKey,
+            stream: "tool",
+            data: {
+              phase: "start",
+              name: toolName,
+              toolCallId: callId,
+              input,
+              summary: described.actionText,
+            },
+          },
+        });
+      } else if (ev.type === "text" && typeof ev.part?.text === "string" && ev.part.text.trim()) {
+        frames.push({
+          type: "event",
+          event: "agent",
+          payload: {
+            runId,
+            sessionKey,
+            stream: "assistant",
+            data: { text: ev.part.text.trim().slice(0, 600) },
+          },
+        });
+      }
+    }
+  }
+  return frames;
+}
+
+async function pollRunLogActivity(runId, agentId, opts = {}) {
+  const { broadcast = true, initialHintBytes = 0 } = opts;
+  let state = runLogState.get(runId);
+  const isFirstAttach = !state;
+  if (!state) {
+    const startOffset = initialHintBytes > 48000 ? initialHintBytes - 48000 : 0;
+    state = { offset: startOffset, recentEvents: [] };
+    runLogState.set(runId, state);
+  }
+
+  const logRes = await fetchPaperclipJson(
+    `/heartbeat-runs/${runId}/log?offset=${state.offset}&limitBytes=65536`,
+  );
+  if (!logRes || typeof logRes.content !== "string" || logRes.content.length === 0) {
+    return;
+  }
+
+  const prevOffset = state.offset;
+  state.offset =
+    typeof logRes.nextOffset === "number" && logRes.nextOffset >= state.offset
+      ? logRes.nextOffset
+      : state.offset + Buffer.byteLength(logRes.content, "utf8");
+
+  const frames = parseLogChunkToAgentEvents(
+    runId,
+    agentId,
+    logRes.content,
+    isFirstAttach && prevOffset > 0,
+  );
+  if (frames.length === 0) return;
+
+  // Keep only the last 8 events in memory for replay on browser reconnect
+  for (const frame of frames) {
+    state.recentEvents.push(frame);
+  }
+  if (state.recentEvents.length > 8) {
+    state.recentEvents = state.recentEvents.slice(-8);
+  }
+
+  if (broadcast) {
+    // Emit at most the latest 6 new frames per poll tick so UI stays snappy
+    for (const frame of frames.slice(-6)) {
+      broadcastEvent(frame);
+    }
+  }
+}
+
+function replayActiveRunsToClient(sendEvent) {
+  if (typeof sendEvent !== "function" || knownActiveRuns.size === 0) return;
+  for (const [runId, agentId] of knownActiveRuns.entries()) {
+    console.log(`[paperclip-gateway] Replaying active run ${runId} for agent ${agentId} to client.`);
+    sendEvent({
+      type: "event",
+      event: "agent",
+      payload: {
+        runId,
+        sessionKey: sessionKeyFor(agentId),
+        stream: "lifecycle",
+        data: { phase: "start" },
+      },
+    });
+    const state = runLogState.get(runId);
+    if (state && state.recentEvents.length > 0) {
+      for (const frame of state.recentEvents.slice(-6)) {
+        sendEvent(frame);
+      }
+    }
+  }
+}
+
+async function syncPaperclipLiveRuns() {
+  const companyId = await getActiveCompanyId();
+  if (!companyId) return;
+  const liveRuns = await fetchPaperclipJson(`/companies/${companyId}/live-runs`);
+  cachedLiveRuns = Array.isArray(liveRuns) ? liveRuns.filter((r) => r.status === "running") : [];
+  if (Array.isArray(liveRuns)) {
+    for (const run of liveRuns) {
+      if (run.status === "running" && run.agentId) {
+        if (!knownActiveRuns.has(run.id)) {
+          knownActiveRuns.set(run.id, run.agentId);
+        }
+        await pollRunLogActivity(run.id, run.agentId, {
+          broadcast: false,
+          initialHintBytes: Number(run.lastOutputBytes || 0),
+        });
+      }
+    }
+  }
+}
 
 async function startPaperclipTelemetryPoller() {
   setInterval(async () => {
@@ -616,6 +1086,11 @@ async function startPaperclipTelemetryPoller() {
                 },
               });
             }
+            // Stream real-time tool calls, thinking traces, and assistant text from Paperclip run logs
+            await pollRunLogActivity(run.id, run.agentId, {
+              broadcast: true,
+              initialHintBytes: Number(run.lastOutputBytes || 0),
+            });
           }
         }
       }
@@ -624,6 +1099,9 @@ async function startPaperclipTelemetryPoller() {
       for (const [runId, agentId] of knownActiveRuns.entries()) {
         if (!currentRunIds.has(runId)) {
           knownActiveRuns.delete(runId);
+          runLogState.delete(runId);
+          liveAgentActivity.delete(agentId);
+          agentContextCache.delete(agentId);
           console.log(`[paperclip-gateway] Agent ${agentId} finished run ${runId}. Broadcasting lifecycle end.`);
           broadcastEvent({
             type: "event",
@@ -729,6 +1207,7 @@ function startAdapter() {
       if (method === "connect") {
         connected = true;
         await syncPaperclipAgents();
+        await syncPaperclipLiveRuns();
         const agents = agentListPayload();
 
         send({

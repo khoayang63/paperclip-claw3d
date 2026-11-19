@@ -576,7 +576,7 @@ const mapAgentToOffice = (agent: AgentState): OfficeAgent => {
       avatarProfile: agent.avatarProfile ?? null,
     };
   }
-  const isWorking = agent.status === "running" || Boolean(agent.runId);
+  const isWorking = agent.status === "running";
   return {
     id: agent.agentId,
     name: agent.name || "Unknown",
@@ -704,7 +704,10 @@ const normalizeOfficeFeedText = (
     .replace(/([.!?])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
-  const deduped = (normalized.match(/[^.!?]+[.!?]?/g) ?? [])
+  if (/^Editing\s+/i.test(normalized)) {
+    return normalized;
+  }
+  const deduped = (normalized.match(/(?:[^.!?]|\.(?=\w))+[.!?]?(?:\s+|$)/g) ?? [])
     .map((fragment) => fragment.trim())
     .filter((fragment, index, fragments) => {
       if (!fragment) return false;
@@ -1386,7 +1389,7 @@ export function OfficeScreen({
       options?: { openChat?: boolean; persistFloorId?: FloorId; selectStore?: boolean },
     ) => {
       setSelectedChatAgentId(agentId);
-      if (options?.openChat !== false) {
+      if (options?.openChat === true) {
         setChatOpen(true);
       }
       if (options?.selectStore !== false) {
@@ -3256,14 +3259,17 @@ export function OfficeScreen({
 
   const activeGithubReviewAgentId = useMemo(
     () =>
-      state.agents.find((agent) => githubHoldByAgentId[agent.agentId])
-        ?.agentId ?? null,
+      state.agents.find(
+        (agent) =>
+          agent.status === "running" && githubHoldByAgentId[agent.agentId],
+      )?.agentId ?? null,
     [githubHoldByAgentId, state.agents],
   );
   const activeQaTestingAgentId = useMemo(
     () =>
-      state.agents.find((agent) => qaHoldByAgentId[agent.agentId])?.agentId ??
-      null,
+      state.agents.find(
+        (agent) => agent.status === "running" && qaHoldByAgentId[agent.agentId],
+      )?.agentId ?? null,
     [qaHoldByAgentId, state.agents],
   );
   useEffect(() => {
@@ -4218,7 +4224,7 @@ export function OfficeScreen({
               runId: agent.runId ?? `latched-${agent.agentId}`,
             }
           : (deskHeld || gymHeld || qaHeld || phoneBoothHeld || smsBoothHeld) &&
-              agent.status !== "error"
+            agent.status === "running"
             ? {
                 ...agent,
                 status: "running",
@@ -4709,14 +4715,16 @@ export function OfficeScreen({
           </div>
         </div>
       ) : null}
-      <OfficeFloorNav
-        activeFloorId={activeFloor.id}
-        floorRosterCache={floorRosterCache}
-        onSelectFloor={(floorId) => {
-          void handleSelectFloor(floorId);
-        }}
-        activeAdapterType={(selectedAdapterType as FloorProvider) ?? null}
-      />
+      {!monitorAgentId ? (
+        <OfficeFloorNav
+          activeFloorId={activeFloor.id}
+          floorRosterCache={floorRosterCache}
+          onSelectFloor={(floorId) => {
+            void handleSelectFloor(floorId);
+          }}
+          activeAdapterType={(selectedAdapterType as FloorProvider) ?? null}
+        />
+      ) : null}
       <section className="relative h-full min-h-0 min-w-0 overflow-hidden">
         <RetroOffice3D
           key={activeFloor.id}
@@ -5456,7 +5464,7 @@ export function OfficeScreen({
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               {focusedChatAgent ? (
                 <AgentChatPanel
                   agent={focusedChatAgent}

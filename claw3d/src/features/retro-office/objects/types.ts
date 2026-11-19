@@ -39,6 +39,7 @@ export type AgentModelProps = {
   onHover?: (id: string) => void;
   onUnhover?: () => void;
   onClick?: (id: string) => void;
+  onSpeechBubbleClick?: (id: string) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
   showSpeech?: boolean;
   speechText?: string | null;

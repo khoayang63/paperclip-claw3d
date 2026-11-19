@@ -26,6 +26,120 @@ const formatAgentNameplateText = (value: string): string => {
   return firstName || normalized;
 };
 
+const formatSpeechBubbleStatus = (
+  text: string,
+  status?: string,
+): { title: string; subtitle: string; icon: string; fileName?: string } => {
+  const trimmed = text.trim();
+  if (!trimmed || (status && status !== "working")) {
+    if (/done|complete|finished/i.test(trimmed)) {
+      return { icon: "✅", title: "Task completed", subtitle: "click to inspect monitor ↗" };
+    }
+    return { icon: "☕", title: "Ready for tasks", subtitle: "click to inspect monitor ↗" };
+  }
+
+  // Quota / Rate limit error
+  if (/quota|limit reached|rate limit|stream error|429/i.test(trimmed)) {
+    return { icon: "⚠️", title: "Hit quota limit", subtitle: "click to view error in monitor ↗" };
+  }
+
+  // Real-time per-tool-call actions streamed from Paperclip / OpenCode logs
+  const runningMatch = trimmed.match(/^Running\s+(.+)$/i);
+  if (runningMatch) {
+    const cmd = runningMatch[1].trim();
+    const isTestCmd = /\b(?:test|vitest|jest|playwright|pytest)\b|\.spec\.|\.test\./i.test(cmd);
+    const shortCmd = cmd.length > 26 ? `${cmd.slice(0, 26)}…` : cmd;
+    return {
+      icon: isTestCmd ? "🧪" : "⚡",
+      title: `Running ${shortCmd}`,
+      subtitle: "click to inspect monitor ↗",
+    };
+  }
+
+  const readingMatch = trimmed.match(/^Reading\s+[`'"]?([^`'":\n\r]+?)[`'"]?$/i);
+  if (readingMatch) {
+    const fileName = readingMatch[1].trim().split("/").pop() || readingMatch[1].trim();
+    return { icon: "📖", title: `Reading ${fileName}`, subtitle: "click to inspect monitor ↗", fileName };
+  }
+
+  const writingMatch = trimmed.match(/^Writing\s+[`'"]?([^`'":\n\r]+?)[`'"]?$/i);
+  if (writingMatch) {
+    const fileName = writingMatch[1].trim().split("/").pop() || writingMatch[1].trim();
+    return { icon: "✍️", title: `Writing ${fileName}`, subtitle: "click to inspect monitor ↗", fileName };
+  }
+
+  const searchingMatch = trimmed.match(/^Searching\s+(.+)$/i);
+  if (searchingMatch) {
+    const query = searchingMatch[1].trim();
+    const shortQuery = query.length > 20 ? `${query.slice(0, 20)}…` : query;
+    return { icon: "🔍", title: `Searching ${shortQuery}`, subtitle: "click to inspect monitor ↗" };
+  }
+
+  if (/^(?:Posting issue update|Creating subtask|Updating issue status|Checking out task|Updating task plan)$/i.test(trimmed)) {
+    return { icon: "📋", title: trimmed, subtitle: "click to inspect monitor ↗" };
+  }
+
+  if (/^Delegating subtask$/i.test(trimmed)) {
+    return { icon: "🤝", title: "Delegating subtask", subtitle: "click to inspect monitor ↗" };
+  }
+
+  if (/^Browsing web$/i.test(trimmed)) {
+    return { icon: "🌐", title: "Browsing web", subtitle: "click to inspect monitor ↗" };
+  }
+
+  // Editing file (e.g. Editing app.js, Editing tests/logic.test.js)
+  const editMatch =
+    trimmed.match(/Editing\s+[`'"]?([a-zA-Z0-9_.\-\/\s]+?\.(?:js|jsx|ts|tsx|css|html|json|md|py|sh|rs|go))(?::|[`'"]|\s|$)/i) ||
+    trimmed.match(/Editing\s+[`'"]?([^`'":\n\r]+?)(?::|\s|`|'|"|$)/i);
+  if (editMatch) {
+    const rawClean = editMatch[1].replace(/\s+/g, "").split("/").pop() || editMatch[1].trim();
+    const isTest = /\.spec\.|\.test\./i.test(rawClean) || /playwright|testing|test suite/i.test(trimmed);
+    const icon = isTest ? "🧪" : "💻";
+    const action = isTest ? "Testing" : "Editing";
+    return { icon, title: `${action} ${rawClean}`, subtitle: "click to inspect monitor ↗", fileName: rawClean };
+  }
+
+  // Testing / QA (e.g., npx playwright test, vitest, spec/test file)
+  if (/playwright|vitest|jest|testing|test suite|\.spec|\.test|pass\s*\/\s*\d+\s*fail/i.test(trimmed)) {
+    const fileMatch = trimmed.match(/([a-zA-Z0-9_.-]+\s*\.\s*(?:spec|test)\s*\.\s*[a-z]+)/i);
+    const fileName = fileMatch ? fileMatch[1].replace(/\s+/g, "").split("/").pop()! : "tests";
+    return { icon: "🧪", title: `Testing ${fileName}`, subtitle: "click to inspect monitor ↗", fileName };
+  }
+
+  // Reviewing / Roadmap / CEO / Planning
+  if (/roadmap|reviewing|planning|milestone/i.test(trimmed)) {
+    const fileMatch = trimmed.match(/([a-zA-Z0-9_.-]+\.md)/i);
+    const fileName = fileMatch ? fileMatch[1].split("/").pop()! : "plan";
+    return { icon: "📋", title: `Reviewing ${fileName}`, subtitle: "click to inspect monitor ↗", fileName };
+  }
+
+  // Git committing / pushing
+  if (/git\s+(?:commit|push|checkout|add)|committed|pushing|pushed/i.test(trimmed)) {
+    const msgMatch = trimmed.match(/git\s+commit\s+-m\s+[`'"]([^`'"]+)[`'"]/i);
+    const summary = msgMatch ? msgMatch[1].slice(0, 18) : "Committing code";
+    return { icon: "📦", title: summary.startsWith("Commit") ? summary : `Commit: ${summary}`, subtitle: "click to inspect monitor ↗" };
+  }
+
+  // Thinking
+  if (/thinking/i.test(trimmed)) {
+    return { icon: "🧠", title: "Thinking...", subtitle: "click to inspect monitor ↗" };
+  }
+
+  // Finished / Idle
+  if (/idle|leave the qa lab|went idle|all agents idle|done|complete/i.test(trimmed)) {
+    return { icon: "✅", title: "Task completed", subtitle: "click to inspect monitor ↗" };
+  }
+
+  // Fallback: extract short action
+  const cleanLine = trimmed
+    .split("\n")[0]
+    .replace(/[#*`$[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const title = cleanLine.length > 22 ? `${cleanLine.slice(0, 22)}…` : cleanLine;
+  return { icon: "⚡", title: title || "Working...", subtitle: "click to inspect monitor ↗" };
+};
+
 const flattenSpeechBubbleMarkdown = (value: string) =>
   value
     .replace(/```[\s\S]*?```/g, " [code] ")
@@ -59,6 +173,7 @@ export const AgentModel = memo(function AgentModel({
   onHover,
   onUnhover,
   onClick,
+  onSpeechBubbleClick,
   onContextMenu,
   showSpeech = false,
   speechText = null,
@@ -615,45 +730,31 @@ export const AgentModel = memo(function AgentModel({
         ? "error"
         : "...";
   const activeSpeechBubble = showSpeech && Boolean(speechText?.trim());
-  const normalizedSpeechBubbleText = activeSpeechBubble
-    ? flattenSpeechBubbleMarkdown(resolvedSpeechText)
+  const bubbleInfo = useMemo(() => {
+    return activeSpeechBubble
+      ? formatSpeechBubbleStatus(resolvedSpeechText, status)
+      : { icon: "", title: "", subtitle: "" };
+  }, [activeSpeechBubble, resolvedSpeechText, status]);
+
+  const speechBubbleDisplayText = bubbleInfo.title
+    ? `${bubbleInfo.icon} ${bubbleInfo.title}`
     : resolvedSpeechText;
-  const speechBubblePreview = activeSpeechBubble
-    ? clampSpeechBubbleText(normalizedSpeechBubbleText)
-    : { text: normalizedSpeechBubbleText, truncated: false };
-  const speechBubbleDisplayText = speechBubblePreview.text;
-  const speechBubbleWasTruncated = speechBubblePreview.truncated;
+  const speechBubbleSubtitleText = bubbleInfo.subtitle || "click to inspect monitor ↗";
   const speechBubbleTextLength = speechBubbleDisplayText.length;
   const speechBubbleWidth = activeSpeechBubble
-    ? Math.min(4.6, Math.max(1.8, 1.55 + speechBubbleTextLength * 0.018))
+    ? Math.min(3.4, Math.max(2.1, 1.4 + speechBubbleTextLength * 0.055))
     : 0.36;
-  const speechBubblePaddingX = activeSpeechBubble ? 0.34 : 0.06;
-  const speechBubblePaddingY = activeSpeechBubble ? 0.3 : 0.06;
+  const speechBubblePaddingX = activeSpeechBubble ? 0.2 : 0.06;
+  const speechBubblePaddingY = activeSpeechBubble ? 0.12 : 0.06;
   const speechBubbleMaxWidth = Math.max(
     0.24,
     speechBubbleWidth - speechBubblePaddingX,
   );
-  const estimatedSpeechCharsPerLine = activeSpeechBubble
-    ? Math.max(10, Math.floor(speechBubbleMaxWidth * 7))
-    : 8;
-  const estimatedSpeechLines = activeSpeechBubble
-    ? Math.max(
-        1,
-        Math.min(
-          MAX_SPEECH_BUBBLE_LINES,
-          Math.ceil(speechBubbleTextLength / estimatedSpeechCharsPerLine),
-        ),
-      )
-    : 1;
-  const speechBubbleHeight = activeSpeechBubble
-    ? Math.max(0.72, estimatedSpeechLines * 0.26 + speechBubblePaddingY)
-    : 0.2;
+  const speechBubbleHeight = activeSpeechBubble ? 0.54 : 0.2;
   const speechBubbleFontSize = activeSpeechBubble
-    ? speechBubbleTextLength > 110
-      ? 0.188
-      : speechBubbleTextLength > 70
-        ? 0.2
-        : 0.216
+    ? speechBubbleTextLength > 24
+      ? 0.148
+      : 0.165
     : 0.13;
   const speechBubbleTextColor = activeSpeechBubble
     ? "#f8fafc"
@@ -666,10 +767,10 @@ export const AgentModel = memo(function AgentModel({
     ? status === "error"
       ? "#ff7f93"
       : status === "working"
-        ? "#93f57d"
-        : "#8dc4ff"
+        ? "#4ade80"
+        : "#38bdf8"
     : "transparent";
-  const speechBubbleBorderInset = activeSpeechBubble ? 0.03 : 0;
+  const speechBubbleBorderInset = activeSpeechBubble ? 0.024 : 0;
   const nameplateText = name ? formatAgentNameplateText(name) : "";
   const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
   const nameplateFontSize =
@@ -1164,11 +1265,11 @@ export const AgentModel = memo(function AgentModel({
               rotation={[0, 0, Math.PI / 4]}
               renderOrder={99997}
             >
-              <planeGeometry args={[0.22, 0.22]} />
+              <planeGeometry args={[0.14, 0.14]} />
               <meshBasicMaterial
                 color="#1a2030"
                 transparent
-                opacity={0.82}
+                opacity={0.88}
                 depthTest={false}
                 depthWrite={false}
               />
@@ -1191,13 +1292,31 @@ export const AgentModel = memo(function AgentModel({
               />
             </mesh>
           ) : null}
-          <mesh position={[0, 0, -0.001]} renderOrder={99999}>
+          <mesh
+            position={[0, 0, -0.001]}
+            renderOrder={99999}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (onSpeechBubbleClick) {
+                onSpeechBubbleClick(agentId);
+              } else {
+                onClick?.(agentId);
+              }
+            }}
+            onPointerOver={(event) => {
+              event.stopPropagation();
+              document.body.style.cursor = "pointer";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+          >
             <planeGeometry args={[speechBubbleWidth, speechBubbleHeight]} />
             <meshBasicMaterial
               ref={speechBubbleMatRef}
               color="#1a2030"
               transparent
-              opacity={activeSpeechBubble ? 0.76 : 0.92}
+              opacity={activeSpeechBubble ? 0.88 : 0.92}
               depthTest={false}
               depthWrite={false}
             />
@@ -1205,15 +1324,15 @@ export const AgentModel = memo(function AgentModel({
           <Text
             position={
               activeSpeechBubble
-                ? [-speechBubbleWidth / 2 + speechBubblePaddingX / 2, 0, 0.001]
+                ? [0, 0.07, 0.001]
                 : [0, 0, 0.001]
             }
             fontSize={speechBubbleFontSize}
             color={speechBubbleTextColor}
-            anchorX={activeSpeechBubble ? "left" : "center"}
+            anchorX="center"
             anchorY="middle"
             maxWidth={speechBubbleMaxWidth}
-            textAlign={activeSpeechBubble ? "left" : "center"}
+            textAlign="center"
             lineHeight={1.1}
             renderOrder={100000}
             depthOffset={-10}
@@ -1222,11 +1341,11 @@ export const AgentModel = memo(function AgentModel({
           >
             {speechBubbleDisplayText}
           </Text>
-          {activeSpeechBubble && speechBubbleWasTruncated ? (
+          {activeSpeechBubble ? (
             <Text
-              position={[0, -speechBubbleHeight * 0.34, 0.001]}
-              fontSize={0.09}
-              color="#8ab4ff"
+              position={[0, -0.11, 0.001]}
+              fontSize={0.082}
+              color="#38bdf8"
               anchorX="center"
               anchorY="middle"
               maxWidth={speechBubbleMaxWidth}
@@ -1236,7 +1355,7 @@ export const AgentModel = memo(function AgentModel({
               material-depthTest={false}
               material-depthWrite={false}
             >
-              click for full chat
+              {speechBubbleSubtitleText}
             </Text>
           ) : null}
         </Billboard>
