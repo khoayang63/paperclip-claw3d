@@ -138,8 +138,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/shared
       commander:
-        specifier: ^15.0.0
-        version: 15.0.0
+        specifier: ^15.1.0
+        version: 15.1.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -1345,9 +1345,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      three:
-        specifier: 0.185.1
-        version: 0.185.1
       yaml:
         specifier: ^2.8.1
         version: 2.9.1
@@ -1385,9 +1382,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.5
         version: 19.2.5(@types/react@19.2.18)
-      '@types/three':
-        specifier: 0.185.4
-        version: 0.185.4
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -6291,8 +6285,8 @@ packages:
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
 
-  commander@15.0.0:
-    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
     engines: {node: '>=22.12.0'}
 
   commander@7.2.0:
@@ -13990,7 +13984,7 @@ snapshots:
   acpx@0.12.0(patch_hash=6st5fzvttegjv64llnfegwwpca):
     dependencies:
       '@agentclientprotocol/sdk': 1.2.1(zod@4.4.3)
-      commander: 15.0.0
+      commander: 15.1.0
       skillflag: 0.2.0
       tsx: 4.23.15
       zod: 4.4.3
@@ -14002,7 +13996,7 @@ snapshots:
   acpx@0.13.1(patch_hash=xh3fclih3ztrbsibpfnxdcx7pe):
     dependencies:
       '@agentclientprotocol/sdk': 1.4.0(zod@4.4.3)
-      commander: 15.0.0
+      commander: 15.1.0
       skillflag: 0.2.1
       tsx: 4.23.15
       zod: 4.4.3
@@ -14378,7 +14372,7 @@ snapshots:
 
   comma-separated-tokens@2.0.3: {}
 
-  commander@15.0.0: {}
+  commander@15.1.0: {}
 
   commander@7.2.0: {}
 
