@@ -304,6 +304,39 @@ async function getAgentContext(agentId) {
     } catch {}
   }
 
+  // Check if workspace files were created in isolated-workspaces/<companyId>/<identifier>
+  if (foundFiles.length === 0 && companyId && activeIssue?.identifier) {
+    const idDir = path.join(
+      process.env.USERPROFILE || "",
+      ".paperclip",
+      "instances",
+      "default",
+      "isolated-workspaces",
+      companyId,
+      activeIssue.identifier,
+    );
+    if (fs.existsSync(idDir)) {
+      workspaceDir = idDir;
+      try {
+        function scanIdDir(dir, depth = 0) {
+          if (depth > 2) return;
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isFile()) {
+              const relPath = path.relative(workspaceDir, fullPath).replace(/\\/g, "/");
+              foundFiles.push({ name: entry.name, relativePath: relPath, fullPath });
+            } else if (entry.isDirectory()) {
+              scanIdDir(fullPath, depth + 1);
+            }
+          }
+        }
+        scanIdDir(workspaceDir);
+      } catch {}
+    }
+  }
+
   // Fallback to Paperclip file-resources API if local filesystem scan found nothing
   if (foundFiles.length === 0 && activeIssue?.id) {
     try {

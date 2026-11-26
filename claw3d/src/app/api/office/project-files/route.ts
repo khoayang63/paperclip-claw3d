@@ -445,10 +445,56 @@ export async function GET(request: Request) {
           wsName = wsName || detail?.currentExecutionWorkspace?.name || null;
         }
         if (!rawCwd) continue;
-        const picked = pickWorkspaceRoot(rawCwd);
-        if (!picked) continue;
-        const scanned = scanWorkspaceFiles(picked, 3);
-        if (scanned.length === 0) continue;
+        let picked = pickWorkspaceRoot(rawCwd);
+        let scanned = picked ? scanWorkspaceFiles(picked, 3) : [];
+
+        // Check if agent saved files directly in isolated-workspaces/<companyId>/<candidate.identifier>
+        if (scanned.length === 0 && candidate.identifier) {
+          const idCandidate = path.join(
+            process.env.USERPROFILE || process.env.HOME || "C:\\Users\\OS",
+            ".paperclip",
+            "instances",
+            "default",
+            "isolated-workspaces",
+            companyId,
+            candidate.identifier,
+          );
+          if (fs.existsSync(idCandidate)) {
+            const pickedId = pickWorkspaceRoot(idCandidate);
+            if (pickedId) {
+              const scannedId = scanWorkspaceFiles(pickedId, 3);
+              if (scannedId.length > 0) {
+                picked = pickedId;
+                scanned = scannedId;
+              }
+            }
+          }
+        }
+
+        // Also check if candidate.id directly has an isolated-workspace folder
+        if (scanned.length === 0 && candidate.id) {
+          const idCandidate = path.join(
+            process.env.USERPROFILE || process.env.HOME || "C:\\Users\\OS",
+            ".paperclip",
+            "instances",
+            "default",
+            "isolated-workspaces",
+            companyId,
+            candidate.id,
+          );
+          if (fs.existsSync(idCandidate)) {
+            const pickedId = pickWorkspaceRoot(idCandidate);
+            if (pickedId) {
+              const scannedId = scanWorkspaceFiles(pickedId, 3);
+              if (scannedId.length > 0) {
+                picked = pickedId;
+                scanned = scannedId;
+              }
+            }
+          }
+        }
+
+        if (!picked || scanned.length === 0) continue;
 
         resolvedDir = picked;
         targetIssue = candidate;

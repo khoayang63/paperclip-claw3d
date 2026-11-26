@@ -2888,3 +2888,28 @@ export {
 export { readProviderFailure, type ProviderFailure } from "./provider-failure.generated.js";
 export type { BoardBootstrap, BoardBootstrapSession } from "./types/board-bootstrap.js";
 export { readBoardBootstrap } from "./board-bootstrap.js";
+export {
+  OFFICE_IDLE_PRESETS,
+  officeAgentBehaviorSchema,
+  agentBehaviorsMapSchema,
+  officeLayoutDocumentSchema,
+  agentSkinsMapSchema,
+  upsertCompanyOfficeLayoutSchema,
+  OFFICE_WORKSPACE_MAX_ENTRIES,
+  OFFICE_WORKSPACE_MAX_FILE_BYTES,
+  OFFICE_WORKSPACE_SOURCE_KINDS,
+  type OfficeIdlePreset,
+  type OfficeAgentBehaviorConfig,
+  type AgentBehaviorsMapInput,
+  type OfficeLayoutDocumentInput,
+  type AgentSkinsMapInput,
+  type UpsertCompanyOfficeLayoutInput,
+  type OfficeWorkspaceSourceKind,
+  type OfficeWorkspaceTarget,
+  type OfficeWorkspaceListResponse,
+  type OfficeWorkspaceEntry,
+  type OfficeWorkspaceTreeResponse,
+  type OfficeWorkspaceFileResponse,
+} from "./validators/office-layout.js";
+export * from "./validators/team-chat.js";
+export * from "./validators/performance.js";

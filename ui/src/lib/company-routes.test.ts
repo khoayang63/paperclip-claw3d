@@ -153,4 +153,24 @@ describe("company routes", () => {
     // Already-prefixed paths are returned untouched.
     expect(applyCompanyPrefix("/PAP/artifacts", "PAP")).toBe("/PAP/artifacts");
   });
+
+  it("treats /office and /3d-office as board routes that need a company prefix", () => {
+    expect(isBoardPathWithoutPrefix("/office")).toBe(true);
+    expect(isBoardPathWithoutPrefix("/3d-office")).toBe(true);
+    expect(extractCompanyPrefixFromPath("/office")).toBeNull();
+    expect(extractCompanyPrefixFromPath("/3d-office")).toBeNull();
+    expect(applyCompanyPrefix("/office", "PAP")).toBe("/PAP/office");
+    expect(applyCompanyPrefix("/3d-office", "PAP")).toBe("/PAP/3d-office");
+    expect(toCompanyRelativePath("/PAP/office")).toBe("/office");
+  });
+
+  it("treats /team-chat routes as board routes that need a company prefix", () => {
+    expect(isBoardPathWithoutPrefix("/team-chat")).toBe(true);
+    expect(isBoardPathWithoutPrefix("/team-chat/room-1")).toBe(true);
+    expect(extractCompanyPrefixFromPath("/team-chat")).toBeNull();
+    expect(extractCompanyPrefixFromPath("/team-chat/room-1")).toBeNull();
+    expect(applyCompanyPrefix("/team-chat", "PAP")).toBe("/PAP/team-chat");
+    expect(applyCompanyPrefix("/team-chat/room-1", "PAP")).toBe("/PAP/team-chat/room-1");
+    expect(toCompanyRelativePath("/PAP/team-chat/room-1")).toBe("/team-chat/room-1");
+  });
 });

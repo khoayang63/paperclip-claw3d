@@ -223,6 +223,7 @@ import { workModeMetaFor } from "../lib/work-mode-meta";
 import { IssueContinuationHandoff } from "../components/IssueContinuationHandoff";
 import { IssueAttachmentsSection } from "../components/IssueAttachmentsSection";
 import { IssueDocumentsSection } from "../components/IssueDocumentsSection";
+import { IssueQualityReviewCard } from "../components/IssueQualityReviewCard";
 import { IssuePlanDecompositionsSection } from "../components/IssuePlanDecompositionsSection";
 import { IssueOutputSection } from "../components/issue-output/IssueOutputSection";
 import { isImageAttachment, isVideoAttachment } from "../lib/issue-attachments";
@@ -8364,6 +8365,12 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
             initialIndex={galleryIndex}
             open={galleryOpen}
             onOpenChange={setGalleryOpen}
+          />
+
+          <IssueQualityReviewCard
+            issueId={issue.id}
+            companyId={issue.companyId}
+            issueStatus={issue.status}
           />
 
           {taskChatShellEnabled ? null : (

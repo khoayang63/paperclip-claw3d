@@ -991,3 +991,21 @@ export * from "./skill-source.js";
 export * from "./agent-commentary.js";
 export * from "./task-workspace.js";
 export * from "./workspace-repository.js";
+export {
+  officeLayoutDocumentSchema,
+  agentSkinsMapSchema,
+  upsertCompanyOfficeLayoutSchema,
+  OFFICE_WORKSPACE_MAX_ENTRIES,
+  OFFICE_WORKSPACE_MAX_FILE_BYTES,
+  OFFICE_WORKSPACE_SOURCE_KINDS,
+  type OfficeLayoutDocumentInput,
+  type AgentSkinsMapInput,
+  type UpsertCompanyOfficeLayoutInput,
+  type OfficeWorkspaceSourceKind,
+  type OfficeWorkspaceTarget,
+  type OfficeWorkspaceListResponse,
+  type OfficeWorkspaceEntry,
+  type OfficeWorkspaceTreeResponse,
+  type OfficeWorkspaceFileResponse,
+} from "./office-layout.js";
+export * from "./team-chat.js";

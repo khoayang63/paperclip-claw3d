@@ -1,6 +1,6 @@
 {
-  "id": "dd860bff-55de-4849-8787-58b9de729258",
-  "prevId": "a1fcb4c6-40e7-47a6-b3f2-c43cd9bf332b",
+  "id": "74a7c72a-a508-446c-901d-8728715107e8",
+  "prevId": "9fcf29d1-a9a6-4ead-8d43-7e087a2b2b24",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -712,6 +712,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "previous_usage_json": {
+          "name": "previous_usage_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "reason": {
           "name": "reason",
@@ -7171,6 +7177,147 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.budget_evaluation_work": {
+      "name": "budget_evaluation_work",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "budget_evaluation_work_company_pending_idx": {
+          "name": "budget_evaluation_work_company_pending_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "budget_evaluation_work_agent_pending_idx": {
+          "name": "budget_evaluation_work_agent_pending_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "budget_evaluation_work_project_pending_idx": {
+          "name": "budget_evaluation_work_project_pending_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "budget_evaluation_work_company_id_companies_id_fk": {
+          "name": "budget_evaluation_work_company_id_companies_id_fk",
+          "tableFrom": "budget_evaluation_work",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.budget_incidents": {
       "name": "budget_incidents",
       "schema": "",
@@ -7513,6 +7660,13 @@
         },
         "enforcement_delivered_version": {
           "name": "enforcement_delivered_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "evaluation_version": {
+          "name": "evaluation_version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -16333,6 +16487,72 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.company_office_layouts": {
+      "name": "company_office_layouts",
+      "schema": "",
+      "columns": {
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "layout": {
+          "name": "layout",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_skins": {
+          "name": "agent_skins",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "updated_by_user_id": {
+          "name": "updated_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "company_office_layouts_company_id_companies_id_fk": {
+          "name": "company_office_layouts_company_id_companies_id_fk",
+          "tableFrom": "company_office_layouts",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.company_onboarding_seeds": {
       "name": "company_onboarding_seeds",
       "schema": "",
@@ -21882,6 +22102,12 @@
         "reported_cost_cents": {
           "name": "reported_cost_cents",
           "type": "numeric(24, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reported_usage_json": {
+          "name": "reported_usage_json",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -28957,6 +29183,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "admitted_project_ids": {
+          "name": "admitted_project_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "settlement_id": {
           "name": "settlement_id",
           "type": "uuid",
@@ -29076,6 +29308,10 @@
         "execution_admissions_settlement_check": {
           "name": "execution_admissions_settlement_check",
           "value": "(\"execution_admissions\".\"settlement_id\" is null) = (\"execution_admissions\".\"settled_at\" is null)"
+        },
+        "execution_admissions_project_set_check": {
+          "name": "execution_admissions_project_set_check",
+          "value": "case when \"execution_admissions\".\"admitted_project_ids\" is null\n    then \"execution_admissions\".\"settled_at\" is not null else array_position(\"execution_admissions\".\"admitted_project_ids\", null) is null and cardinality(\"execution_admissions\".\"admitted_project_ids\") <= 100 end"
         }
       },
       "isRLSEnabled": false
@@ -44014,6 +44250,133 @@
           "value": "(\"managed_agent_profiles\".\"qualified_at\" IS NULL AND \"managed_agent_profiles\".\"qualified_revision\" IS NULL) OR (\"managed_agent_profiles\".\"qualified_at\" IS NOT NULL AND \"managed_agent_profiles\".\"qualification\" <> '{}'::jsonb AND \"managed_agent_profiles\".\"qualified_revision\" ~ '^sha256:[0-9a-f]{64}$')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.native_harness_backups": {
+      "name": "native_harness_backups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issue_id": {
+          "name": "issue_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope_digest": {
+          "name": "scope_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_sha256": {
+          "name": "manifest_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "reference": {
+          "name": "reference",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "native_harness_backups_current_idx": {
+          "name": "native_harness_backups_current_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope_digest",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"native_harness_backups\".\"status\" = 'current'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "native_harness_backups_scope_idx": {
+          "name": "native_harness_backups_scope_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope_digest",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_sha256",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.native_run_finalizations": {

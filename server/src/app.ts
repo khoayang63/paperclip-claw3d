@@ -150,6 +150,9 @@ import { sidebarPreferenceRoutes } from "./routes/sidebar-preferences.js";
 import { announcementRoutes } from "./routes/announcements.js";
 import { serverVersion } from "./version.js";
 import { workspacePreferenceRoutes } from "./routes/workspace-preferences.js";
+import { officeLayoutRoutes } from "./routes/office-layout.js";
+import { teamChatRoutes } from "./routes/team-chat.js";
+import { performanceRoutes } from "./routes/performance.js";
 import { primaryAgentRoutes } from "./routes/primary-agent.js";
 import { resourceMembershipRoutes } from "./routes/resource-memberships.js";
 import { inboxDismissalRoutes } from "./routes/inbox-dismissals.js";
@@ -837,6 +840,9 @@ export async function createApp(
   api.use(resourceMembershipRoutes(db));
   api.use(primaryAgentRoutes(db));
   api.use(workspacePreferenceRoutes(db));
+  api.use(officeLayoutRoutes(db));
+  api.use(teamChatRoutes(db));
+  api.use(performanceRoutes(db));
   api.use(inboxDismissalRoutes(db));
   api.use(instanceSettingsRoutes(db, workerManager, opts.prepareIdleDatabaseBackup));
   if (opts.databaseBackupService) {

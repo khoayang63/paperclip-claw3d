@@ -4,6 +4,7 @@ import {
   CircleDot,
   Target,
   LayoutDashboard,
+  Box,
   DollarSign,
   History,
   Search,
@@ -152,6 +153,8 @@ export function Sidebar() {
               Cmd/Ctrl+K remains the keyboard path (command palette). */}
           <SidebarNavItem to="/search" label="Search" icon={Search} />
           <SidebarNavItem to="/dashboard" label="Dashboard" icon={LayoutDashboard} liveCount={liveRunCount} />
+          <SidebarNavItem to="/office" label="3D Office" icon={Box} />
+          <SidebarNavItem to="/team-chat" label="Team Chat" icon={MessagesSquare} />
           <SidebarNavItem
             to="/inbox"
             label="Inbox"

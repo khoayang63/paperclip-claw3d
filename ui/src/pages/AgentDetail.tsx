@@ -105,6 +105,7 @@ import {
   Gauge,
   Pencil,
   Trash2,
+  Box,
 } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -930,7 +931,10 @@ export function AgentDetail() {
           assignLabel="Assign task"
           showStatus={false}
           workActionsInMenu
-          menuItems={[{ label: "Agent history", icon: HistoryIcon, onSelect: () => setHistoryOpen(true) }]}
+          menuItems={[
+            { label: "Agent history", icon: HistoryIcon, onSelect: () => setHistoryOpen(true) },
+            { label: "View in 3D Office", icon: Box, onSelect: () => navigate(`/office?agent=${encodeURIComponent(currentAgent.id)}`) },
+          ]}
           actionsDisabled={agentAction.isPending || (activeView === "advanced" && configSaving)}
           workActionsDisabled={hasInvalidOrgChain}
           workActionsDisabledReason="Repair this agent's reporting chain before assigning tasks or starting runs"

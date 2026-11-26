@@ -138,6 +138,7 @@ export function Layout({ sidebarSections }: { sidebarSections?: ReactNode }) {
   const useStreamlinedTaskDetailShell = streamlinedUiEnabled && (isTaskDetailRoute || isAgentChatRoute);
   const isToolsRoute = companyPathSegments[0]?.toLowerCase() === "tools";
   const isAppsRoute = companyPathSegments[0]?.toLowerCase() === "apps";
+  const isOfficeRoute = companyPathSegments[0]?.toLowerCase() === "office";
   const appDetailConnectionId =
     isAppsRoute && companyPathSegments[1] && !RESERVED_APP_SUBPATHS.has(companyPathSegments[1].toLowerCase())
       ? companyPathSegments[1]
@@ -728,7 +729,8 @@ export function Layout({ sidebarSections }: { sidebarSections?: ReactNode }) {
                   : undefined
               }
               className={cn(
-                "flex-1 p-4 outline-none md:p-6",
+                "flex-1 outline-none",
+                isOfficeRoute ? "p-0 md:p-0 overflow-hidden" : "p-4 md:p-6",
                 // The task thread owns its scrollable top spacing. Leaving the
                 // page shell's top padding in place creates a stationary dark
                 // strip below the breadcrumb while messages scroll behind it.
@@ -736,11 +738,12 @@ export function Layout({ sidebarSections }: { sidebarSections?: ReactNode }) {
                 // Reserve the scrollbar gutter on desktop so pages whose height
                 // changes (e.g. switching skill-detail tabs) don't widen/shift
                 // when the vertical scrollbar appears or disappears (PAP-10907).
-                isMobile
-                  ? isTaskDetailRoute
-                    ? "overflow-visible pb-(--tc-composer-visible-nav-offset)"
-                    : "overflow-visible pb-(--sz-calc-14)"
-                  : "overflow-auto [scrollbar-gutter:stable]",
+                !isOfficeRoute &&
+                  (isMobile
+                    ? isTaskDetailRoute
+                      ? "overflow-visible pb-(--tc-composer-visible-nav-offset)"
+                      : "overflow-visible pb-(--sz-calc-14)"
+                    : "overflow-auto [scrollbar-gutter:stable]"),
               )}
             >
               {hasUnknownCompanyPrefix ? (

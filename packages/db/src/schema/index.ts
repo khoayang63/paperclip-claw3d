@@ -278,3 +278,10 @@ export { issueThreadInteractionIdempotencyKeys } from "./issue_thread_interactio
 
 export { projectTaskExecutionPolicies, executionAdmissions, executionAdmissionProjectCharges } from "./execution_admissions.js";
 export { budgetEvaluationWork } from "./budget_evaluation_work.js";
+export { companyOfficeLayouts } from "./company_office_layouts.js";
+export {
+  teamChatRooms,
+  teamChatRoomMembers,
+  teamChatRoomMessages,
+} from "./team_chat_rooms.js";
+export { issueQualityReviews } from "./issue_quality_reviews.js";

@@ -73,6 +73,9 @@ const Cases = lazy(() => import("./pages/Cases").then((module) => ({ default: mo
 const CaseDetail = lazy(() => import("./pages/CaseDetail").then((module) => ({ default: module.CaseDetail })));
 const Dashboard = lazy(() => import("./pages/Dashboard").then((module) => ({ default: module.Dashboard })));
 const DashboardLive = lazy(() => import("./pages/DashboardLive").then((module) => ({ default: module.DashboardLive })));
+const Office3D = lazy(() => import("./pages/Office3D").then((module) => ({ default: module.Office3D })));
+const TeamChatPage = lazy(() => import("./pages/TeamChat").then((module) => ({ default: module.TeamChatPage })));
+const PerformancePage = lazy(() => import("./pages/Performance").then((module) => ({ default: module.PerformancePage })));
 const Timeline = lazy(() => import("./pages/Timeline").then((module) => ({ default: module.Timeline })));
 const Companies = lazy(() => import("./pages/Companies").then((module) => ({ default: module.Companies })));
 const AgentDetail = lazy(() => import("./pages/AgentDetailPage").then((module) => ({ default: module.AgentDetailPage })));
@@ -153,6 +156,11 @@ function boardRoutes(streamlinedUiEnabled: boolean, combinedInboxTasksEnabled: b
       <Route index element={<Navigate to="dashboard" replace />} />
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="dashboard/live" element={<DashboardLive />} />
+      <Route path="office" element={<Office3D />} />
+      <Route path="3d-office" element={<Navigate to="/office" replace />} />
+      <Route path="team-chat" element={<TeamChatPage />} />
+      <Route path="team-chat/:roomId" element={<TeamChatPage />} />
+      <Route path="performance" element={<PerformancePage />} />
       <Route
         path="timeline"
         element={streamlinedUiEnabled ? <AuditCompatibilityRedirect to="/activity/timeline" /> : <Timeline />}
@@ -809,6 +817,10 @@ export function App() {
           <Route path="instance/settings" element={<LegacySettingsRedirect />} />
           <Route path="instance/settings/*" element={<LegacySettingsRedirect />} />
           <Route path="companies" element={<UnprefixedBoardRedirect />} />
+          <Route path="office" element={<UnprefixedBoardRedirect />} />
+          <Route path="3d-office" element={<Navigate to="/office" replace />} />
+          <Route path="team-chat" element={<UnprefixedBoardRedirect />} />
+          <Route path="team-chat/*" element={<UnprefixedBoardRedirect />} />
           <Route path="issues" element={<UnprefixedBoardRedirect />} />
           <Route path="tasks" element={<UnprefixedBoardRedirect />} />
           <Route path="issues/:issueId" element={<UnprefixedBoardRedirect />} />
@@ -833,6 +845,7 @@ export function App() {
             </>
           ) : null}
           <Route path="decisions" element={<UnprefixedBoardRedirect />} />
+          <Route path="performance" element={<UnprefixedBoardRedirect />} />
           <Route path="u/:userSlug" element={<UnprefixedBoardRedirect />} />
           <Route path="skills/studio" element={<UnprefixedBoardRedirect />} />
           <Route path="skills/studio/new" element={<UnprefixedBoardRedirect />} />

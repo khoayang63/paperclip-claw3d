@@ -736,4 +736,19 @@ export const queryKeys = {
     availability: (companyId: string | null, environmentId?: string | null) =>
       ["adapters", "availability", companyId, environmentId ?? null] as const,
   },
+  teamChat: {
+    rooms: (companyId: string) => ["team-chat", "rooms", companyId] as const,
+    room: (companyId: string, roomId: string) =>
+      ["team-chat", "room", companyId, roomId] as const,
+    connections: (companyId: string) =>
+      ["team-chat", "connections", companyId] as const,
+    models: (companyId: string, connectionId: string) =>
+      ["team-chat", "models", companyId, connectionId] as const,
+  },
+  performance: {
+    company: (companyId: string, window: string) =>
+      ["performance", companyId, window] as const,
+    issueReview: (issueId: string) =>
+      ["performance", "issue-review", issueId] as const,
+  },
 };

@@ -6,6 +6,7 @@ import {
   CircleCheck,
   Target,
   LayoutDashboard,
+  Box,
   DollarSign,
   History,
   Search,
@@ -24,6 +25,7 @@ import {
   GanttChartSquare,
   LayoutGrid,
   Users,
+  BarChart3,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -184,6 +186,9 @@ function ClassicSidebar({ children }: { children?: ReactNode }) {
               Cmd/Ctrl+K remains the keyboard path (command palette). */}
           <SidebarNavItem to="/search" label="Search" icon={Search} />
           <SidebarNavItem to="/dashboard" label="Dashboard" icon={LayoutDashboard} liveCount={liveRunCount} />
+          <SidebarNavItem to="/office" label="3D Office" icon={Box} />
+          <SidebarNavItem to="/team-chat" label="Team Chat" icon={MessagesSquare} />
+          <SidebarNavItem to="/performance" label="Performance" icon={BarChart3} />
           {!combinedInboxTasks ? (
             <SidebarNavItem
               to="/inbox"

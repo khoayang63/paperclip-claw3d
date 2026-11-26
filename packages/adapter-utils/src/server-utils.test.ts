@@ -16,6 +16,7 @@ import {
   buildRuntimeToolsEnv,
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
+  ensurePaperclipSkillSymlink,
   isPaperclipExternalChatContractTurn,
   isPaperclipExternalChatQuestionResponseTurn,
   isPaperclipExternalChatTurn,
@@ -4063,5 +4064,31 @@ describe("wake continuation comment ownership", () => {
       executionContinuation: { ...continuation([]), objective },
     }, { suppressIssueDescription: true });
     expect(legacy).toContain(`"objective":"${objective}"`);
+  });
+});
+
+describe("ensurePaperclipSkillSymlink", () => {
+  it("creates, skips, and repairs skill directory links including Windows junctions", async () => {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-skill-link-"));
+    try {
+      const sourceA = path.join(tmpRoot, "source-a");
+      const sourceB = path.join(tmpRoot, "source-b");
+      const target = path.join(tmpRoot, "skills", "paperclip");
+      await fs.mkdir(sourceA, { recursive: true });
+      await fs.mkdir(sourceB, { recursive: true });
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(path.join(sourceA, "SKILL.md"), "# Paperclip A\n");
+      await fs.writeFile(path.join(sourceB, "SKILL.md"), "# Paperclip B\n");
+
+      expect(await ensurePaperclipSkillSymlink(sourceA, target)).toBe("created");
+      expect(await fs.readFile(path.join(target, "SKILL.md"), "utf8")).toBe("# Paperclip A\n");
+      expect(await ensurePaperclipSkillSymlink(sourceA, target)).toBe("skipped");
+
+      await fs.rm(sourceA, { recursive: true, force: true });
+      expect(await ensurePaperclipSkillSymlink(sourceB, target)).toBe("repaired");
+      expect(await fs.readFile(path.join(target, "SKILL.md"), "utf8")).toBe("# Paperclip B\n");
+    } finally {
+      await fs.rm(tmpRoot, { recursive: true, force: true });
+    }
   });
 });

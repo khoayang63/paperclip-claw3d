@@ -1,0 +1,2 @@
+ALTER TABLE "team_chat_rooms" ADD COLUMN "max_output_tokens" integer DEFAULT 1024 NOT NULL;--> statement-breakpoint
+ALTER TABLE "team_chat_rooms" ADD COLUMN "work_event_mode" text DEFAULT 'off' NOT NULL;

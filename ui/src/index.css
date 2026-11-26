@@ -5292,3 +5292,196 @@ html:not(.dark) .coordinator-sidebar {
 @media (prefers-reduced-motion: reduce) {
   .agent-selection-bar { transition: none; transform: translate(-50%, 0); }
 }
+
+/* ── Native 3D Office Design Tokens ──────────────────────────────────────── */
+/* Hex values are stored here in the token layer so Three.js materials can
+   parse them via getComputedStyle without literal colors in components/pages
+   and without relying on oklch() parsing in THREE.Color. */
+:root {
+  --office-palette-slate: #64748b;
+  --office-palette-sand: #d6c29f;
+  --office-palette-sage: #7ea388;
+  --office-palette-sky: #6ea8d6;
+  --office-palette-rose: #c97b84;
+  --office-palette-amber: #d99b43;
+  --office-palette-graphite: #3f4654;
+
+  --office-floor-base: #e7e5e0;
+  --office-grid-line: #cbd5e1;
+  --office-wall-wood: #8f6b4a;
+  --office-wall-glass: #93c5fd;
+  --office-desk-top: #dfd3c3;
+  --office-desk-frame: #334155;
+  --office-chair-seat: #1e293b;
+  --office-screen-off: #0f172a;
+  --office-screen-on: #38bdf8;
+  --office-furniture-accent: #7c5838;
+  --office-plant-leaf: #2e8b57;
+  --office-plant-pot: #b4694e;
+  --office-book-red: #c2414b;
+  --office-book-teal: #2a9d8f;
+  --office-book-gold: #e9c46a;
+  --office-water-jug: #7dd3fc;
+  --office-printer-body: #cbd5e1;
+  --office-elevator: #475569;
+  --office-exterior-wall: #cbd5e1;
+  --office-exterior-trim: #64748b;
+  --office-exterior-window: #93c5fd;
+  --office-exterior-window-lit: #fde68a;
+  --office-roof-surface: #475569;
+  --office-roof-trim: #1e293b;
+  --office-ground-grass: #4b7f52;
+  --office-ground-grass-alt: #3e6e46;
+  --office-ground-paving: #94a3b8;
+  --office-ground-stone: #cbd5e1;
+  --office-water-pond: #38bdf8;
+  --office-sakura-blossom: #f9a8d4;
+  --office-pine-leaf: #1f5c3a;
+  --office-fence-wood: #9a6b44;
+  --office-animal-shiba: #d98236;
+  --office-animal-cream: #f8efe4;
+  --office-animal-koi: #f97316;
+  --office-entrance-canopy: #334155;
+
+  --office-sky-dawn-top: #3b4b7a;
+  --office-sky-dawn-horizon: #f4a27e;
+  --office-sky-day-top: #4b8fe2;
+  --office-sky-day-horizon: #cfe8ff;
+  --office-sky-sunset-top: #2c2454;
+  --office-sky-sunset-horizon: #f07b54;
+  --office-sky-night-top: #070b18;
+  --office-sky-night-horizon: #172342;
+
+  --office-sun-dawn: #ffbe88;
+  --office-sun-day: #fff8ea;
+  --office-sun-sunset: #ff8c5a;
+  --office-sun-night: #8fa8e8;
+  --office-sun-core: #fef08a;
+  --office-sun-halo: #fde047;
+  --office-moon-surface: #e2e8f0;
+  --office-moon-crater: #94a3b8;
+
+  --office-ambient-dawn: #a992b3;
+  --office-ambient-day: #d8e6f5;
+  --office-ambient-sunset: #9c6e8f;
+  --office-ambient-night: #2c3e66;
+
+  --office-fog-dawn: #d9a79c;
+  --office-fog-day: #c7def2;
+  --office-fog-sunset: #8e6178;
+  --office-fog-night: #0d1528;
+
+  --office-lamp-warm: #ffd88a;
+  --office-weather-rain: #60a5fa;
+  --office-weather-snow: #f8fafc;
+  --office-trophy-gold: #f59e0b;
+  --office-blossom-gold: #fbbf24;
+  --office-handoff-beam: #38bdf8;
+
+  --office-status-healthy: #22c55e;
+  --office-status-warning: #f59e0b;
+  --office-status-critical: #ef4444;
+  --office-status-idle: #94a3b8;
+  --office-status-thinking: #a855f7;
+  --office-status-coding: #3b82f6;
+
+  --office-skin-tone1: #fce0c8;
+  --office-skin-tone2: #f1c29b;
+  --office-skin-tone3: #d89b6e;
+  --office-skin-tone4: #9f6743;
+  --office-skin-tone5: #5d3a24;
+
+  --office-hair-black: #18181b;
+  --office-hair-brown: #5b3a24;
+  --office-hair-blonde: #e3b954;
+  --office-hair-red: #b8422b;
+  --office-hair-gray: #9ca3af;
+  --office-hair-blue: #3b82f6;
+
+  --office-outfit-shirt: #e2e8f0;
+  --office-outfit-hoodie: #2563eb;
+  --office-outfit-suit: #1e293b;
+  --office-outfit-tshirt: #0d9488;
+  --office-outfit-apron: #b45309;
+  --office-pants-default: #334155;
+  --office-shoes-default: #111827;
+  --office-accessory-dark: #0f172a;
+  --office-accessory-accent: #38bdf8;
+  --office-accessory-hardhat: #eab308;
+}
+
+.dark {
+  --office-floor-base: #2a2f3a;
+  --office-grid-line: #3b4252;
+  --office-desk-top: #5c4d42;
+  --office-exterior-wall: #334155;
+  --office-exterior-trim: #1e293b;
+  --office-ground-grass: #243b2c;
+  --office-ground-grass-alt: #1e3326;
+  --office-ground-paving: #3b4352;
+  --office-ground-stone: #4b5563;
+  --office-water-pond: #0ea5e9;
+}
+
+.office-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 28rem;
+  overflow: hidden;
+  outline: none;
+}
+
+.office-pip-frame {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 18rem;
+  height: 11.5rem;
+  z-index: var(--z-40);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--selection-bar-shadow);
+}
+
+.office-minimap {
+  width: 12.5rem;
+  height: 12.5rem;
+}
+
+.office-hud-label {
+  font-size: var(--text-xs);
+  line-height: 1.25;
+}
+
+.office-swatch {
+  background-color: var(--office-swatch-color);
+}
+
+.office-station-dialog {
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.office-inspector-panel {
+  top: 4.5rem;
+}
+
+.office-side-drawer {
+  top: 4.5rem;
+  bottom: 1rem;
+  width: 24rem;
+  max-width: calc(100vw - 2rem);
+}
+
+.office-chat-bubble {
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  max-width: 13rem;
+}
+
+.office-replay-bar {
+  max-width: 44rem;
+}
+

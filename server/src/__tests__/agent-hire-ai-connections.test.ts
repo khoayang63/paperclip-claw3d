@@ -580,6 +580,56 @@ describe("agent-created hires use managed AI connections", () => {
     expect(response.body.details.code).toBe("ai_connection_incompatible");
     expect(await db.select().from(agents).where(eq(agents.companyId, f.companyId))).toHaveLength(1);
   });
+
+  it("allows clearing a shared OpenRouter binding when switching an opencode_local agent to a non-OpenRouter model", async () => {
+    const f = await fixture("openai");
+    await db.insert(principalPermissionGrants).values({
+      companyId: f.companyId,
+      principalType: "user",
+      principalId: f.userId,
+      permissionKey: "agents:configure",
+    });
+    const account = await aiConnectionService(db).save(f.companyId, f.userId, {
+      provider: "openrouter",
+      method: "api_key",
+      ownership: "shared",
+      name: "Shared OpenRouter",
+      apiKey: "fixture",
+      agentIds: [f.agentId],
+      allAgents: false,
+    }, "fixture");
+    const openRouterBinding = {
+      provider: "openrouter",
+      method: "api_key",
+      mode: "shared",
+      ...account,
+    } as const;
+    await db.update(agents).set({
+      adapterType: "opencode_local",
+      adapterConfig: { model: "openrouter/openrouter/free" },
+      runtimeConfig: { aiConnection: openRouterBinding, heartbeat: { enabled: false } },
+    }).where(eq(agents.id, f.agentId));
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.actor = { type: "board", userId: f.userId, companyIds: [f.companyId], source: "session" };
+      next();
+    });
+    app.use("/api", agentRoutes(db));
+    app.use(errorHandler);
+
+    const response = await request(app).patch(`/api/agents/${f.agentId}`).send({
+      adapterConfig: { model: "opencode/nemotron-3.5-lightning-free" },
+      runtimeConfig: { heartbeat: { enabled: false } },
+    });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.adapterConfig.model).toBe("opencode/nemotron-3.5-lightning-free");
+    expect(response.body.runtimeConfig.aiConnection).toBeUndefined();
+
+    const [saved] = await db.select().from(agents).where(eq(agents.id, f.agentId));
+    expect(saved.adapterConfig.model).toBe("opencode/nemotron-3.5-lightning-free");
+    expect(saved.runtimeConfig.aiConnection).toBeUndefined();
+  });
 });
 
 describe("hired agents sharing a subscription", () => {

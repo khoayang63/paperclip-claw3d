@@ -51,6 +51,7 @@ import {
 } from "./services/native-runtime/native-workspace-sync-retention.js";
 import { markGitRestorePointExpired } from "./services/git-restore-point-storage.js";
 import { subscribeAllCompanyLiveEvents } from "./services/live-events.js";
+import { teamChatWorkEventService } from "./services/team-chat-work-events.js";
 import { DELIVERY_QUEUES } from "./services/delivery-work-notifications.js";
 import { registerBudgetEnforcementWork, registerCostAccountingWork } from "./services/budget-enforcement-worker.js";
 import { caseHandoffDeliveryService } from "./services/case-handoff-delivery.js";
@@ -1373,6 +1374,16 @@ async function startServerWithDatabaseTeardown(
       .catch(err => logger.error({ err }, "post-commit chat completion delivery failed")));
   });
   server.on("close", unsubscribeChatCompletions);
+  const teamChatWorkEvents = teamChatWorkEventService(db as any);
+  const unsubscribeTeamChatWorkEvents = subscribeAllCompanyLiveEvents((event) => {
+    if (isIdleTaskDrainActive() || isWarmStandby() || heartbeatSchedulerStopped) return;
+    trackHeartbeatSchedulerWork(
+      teamChatWorkEvents
+        .handleLiveEvent(event)
+        .catch((err) => logger.warn({ err }, "post-commit team chat work event failed")),
+    );
+  });
+  server.on("close", unsubscribeTeamChatWorkEvents);
   const cleanupInspectionRuntime = environmentRuntimeService(db as any, { pluginWorkerManager });
   const environmentCustomImages = environmentCustomImageService(db as any, { pluginWorkerManager });
   const historicalCleanup = historicalCleanupVerificationService(db as any, {

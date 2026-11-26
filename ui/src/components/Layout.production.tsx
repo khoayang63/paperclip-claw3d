@@ -158,6 +158,7 @@ export function Layout() {
   );
   const isToolsRoute = companyPathSegments[0]?.toLowerCase() === "tools";
   const isAppsRoute = companyPathSegments[0]?.toLowerCase() === "apps";
+  const isOfficeRoute = companyPathSegments[0]?.toLowerCase() === "office";
   const appDetailConnectionId =
     isAppsRoute &&
     companyPathSegments[1] &&
@@ -711,15 +712,17 @@ export function Layout() {
                     : undefined
                 }
                 className={cn(
-                  "flex-1 p-4 outline-none md:p-6",
+                  "flex-1 outline-none",
+                  isOfficeRoute ? "p-0 md:p-0 overflow-hidden" : "p-4 md:p-6",
                   // Reserve the scrollbar gutter on desktop so pages whose height
                   // changes (e.g. switching skill-detail tabs) don't widen/shift
                   // when the vertical scrollbar appears or disappears (PAP-10907).
-                  isMobile
-                    ? isTaskDetailRoute
-                      ? "overflow-visible pb-(--tc-composer-visible-nav-offset)"
-                      : "overflow-visible pb-(--sz-calc-14)"
-                    : "overflow-auto [scrollbar-gutter:stable]",
+                  !isOfficeRoute &&
+                    (isMobile
+                      ? isTaskDetailRoute
+                        ? "overflow-visible pb-(--tc-composer-visible-nav-offset)"
+                        : "overflow-visible pb-(--sz-calc-14)"
+                      : "overflow-auto [scrollbar-gutter:stable]"),
                 )}
               >
                 {hasUnknownCompanyPrefix ? (

@@ -108,6 +108,7 @@ Use this index to open a recipe or copy its feature and full capability IDs.
 | `activity` | [Dashboards and audit trails](activity.md) | `activity/overview`, `activity/activity`, `activity/runs`, `activity/routine-audit`, `activity/timeline`, `activity/agent-commentary` |
 | `navigation-preferences` | [Navigation, profile, and announcements](navigation-preferences.md) | `navigation-preferences/navigation`, `navigation-preferences/preferences`, `navigation-preferences/profile`, `navigation-preferences/announcements`, `navigation-preferences/fallbacks`, `navigation-preferences/command-palette` |
 | `instance-operations` | [Instance operations](instance-operations.md) | `instance-operations/install-update`, `instance-operations/server-service`, `instance-operations/configuration`, `instance-operations/diagnostics`, `instance-operations/backup`, `instance-operations/runtime-setup` |
+| `office-3d` | [Native 3D Office](office-3d.md) | `office-3d/scene-navigation`, `office-3d/control-plane-stations`, `office-3d/build-mode-persistence`, `office-3d/agent-movement-replay` |
 | `cli-operations` | [CLI/API and local worktrees](cli-operations.md) | `cli-operations/context`, `cli-operations/domain-commands`, `cli-operations/outputs`, `cli-operations/run-controls`, `cli-operations/worktree-instances`, `cli-operations/feedback-export` |
 
 ### Contributor surfaces

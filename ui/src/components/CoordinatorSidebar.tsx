@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, Bell, Boxes, ChevronRight, CircleCheck, FolderOpen, History, LayoutDashboard, MessageCircle, MoreHorizontal, Network, Pin, PinOff, Plus, Repeat, Search, Settings, SquarePen, Unplug } from "lucide-react";
+import { Inbox, Bell, Box, Boxes, ChevronRight, CircleCheck, FolderOpen, History, LayoutDashboard, MessageCircle, MessagesSquare, MoreHorizontal, Network, Pin, PinOff, Plus, Repeat, Search, Settings, SquarePen, Unplug } from "lucide-react";
 import type { Project } from "@paperclipai/shared";
 import { useCoordinatorAttentionCount } from "@/hooks/useCoordinatorAttentionCount";
 import { issuesApi } from "@/api/issues";
@@ -27,6 +27,8 @@ const moreDestinations = [
   { label: "Search", to: "/search", icon: Search },
   { label: "Inbox", to: "/inbox", icon: Inbox },
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
+  { label: "3D Office", to: "/office", icon: Box },
+  { label: "Team Chat", to: "/team-chat", icon: MessagesSquare },
   { label: "Projects", to: "/projects", icon: FolderOpen },
   { label: "Routines", to: "/routines", icon: Repeat },
   { label: "Artifacts", to: "/artifacts", icon: Boxes },
@@ -130,7 +132,7 @@ export function CoordinatorSidebar({ children }: { children?: ReactNode }) {
               const pinned = pinnedNavigation.pins.includes(to);
               const PinIcon = pinned ? PinOff : Pin;
               return <div key={to}>
-                {index === 6 || index === 10 ? <div role="separator" className="my-1 border-t border-border" /> : null}
+                {index === 7 || index === 11 ? <div role="separator" className="my-1 border-t border-border" /> : null}
                 <div className="group/coordinator-more relative flex items-center rounded-sm transition-colors hover:bg-accent">
                   <Link to={to} onClick={() => { setMoreOpen(false); if (isMobile) setSidebarOpen(false); }} className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-1.5 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Icon className="size-4 shrink-0 text-muted-foreground" />{label}

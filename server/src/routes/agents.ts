@@ -5672,9 +5672,35 @@ export function agentRoutes(
     if (existing.runtimeConfig.aiConnection && requestedRuntimeConfig && !requestedRuntimeConfig.aiConnection
       && !isAgentSetupDraft(existing)) {
       const existingBinding = aiRuntimeConnectionBindingSchema.safeParse(existing.runtimeConfig.aiConnection).data;
-      if (existingBinding && agentHarnessType(existing.adapterType, existing.adapterConfig) === agentHarnessType(requestedAdapterType, nextAiConfig)
-        && (existingBinding.mode === "router" || isAiConnectionCompatible(existingBinding,
-          requestedAdapterType, nextAiConfig.model, nextAiConfig.provider, nextAiConfig.acpxAgent))) {
+      let stillCompatible = Boolean(
+        existingBinding
+        && agentHarnessType(existing.adapterType, existing.adapterConfig) === agentHarnessType(requestedAdapterType, nextAiConfig)
+        && (existingBinding.mode === "router" || isAiConnectionCompatible(
+          existingBinding,
+          requestedAdapterType,
+          nextAiConfig.model,
+          nextAiConfig.provider,
+          nextAiConfig.acpxAgent,
+        )),
+      );
+      if (stillCompatible && existingBinding && (existingBinding.mode === "shared" || existingBinding.mode === "delegated")) {
+        const connection = await db
+          .select({ config: toolConnections.config })
+          .from(toolConnections)
+          .where(and(eq(toolConnections.id, existingBinding.connectionId), eq(toolConnections.companyId, existing.companyId)))
+          .then((rows) => rows[0] ?? null);
+        const metadata = aiConnectionMetadataSchema.safeParse(asRecord(connection?.config)?.ai).data;
+        if (metadata) {
+          stillCompatible = isAiConnectionCompatible(
+            metadata,
+            requestedAdapterType,
+            nextAiConfig.model,
+            nextAiConfig.provider,
+            nextAiConfig.acpxAgent,
+          );
+        }
+      }
+      if (stillCompatible && existingBinding) {
         requestedRuntimeConfig.aiConnection = existingBinding;
       }
     }

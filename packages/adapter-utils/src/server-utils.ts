@@ -4366,7 +4366,12 @@ export async function ensurePaperclipSkillSymlink(
   linkSkill: (source: string, target: string) => Promise<void> = (
     linkSource,
     linkTarget,
-  ) => fs.symlink(linkSource, linkTarget),
+  ) =>
+    fs.symlink(
+      linkSource,
+      linkTarget,
+      process.platform === "win32" ? "junction" : undefined,
+    ),
 ): Promise<"created" | "repaired" | "skipped"> {
   const existing = await fs.lstat(target).catch(() => null);
   if (!existing) {
@@ -4382,7 +4387,7 @@ export async function ensurePaperclipSkillSymlink(
   if (!linkedPath) return "skipped";
 
   const resolvedLinkedPath = path.resolve(path.dirname(target), linkedPath);
-  if (resolvedLinkedPath === source) {
+  if (resolvedLinkedPath === path.resolve(source)) {
     return "skipped";
   }
 
