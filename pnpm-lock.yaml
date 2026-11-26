@@ -924,8 +924,8 @@ importers:
         specifier: 4.0.86
         version: 4.0.86(zod@4.4.3)
       '@ai-sdk/xai':
-        specifier: 5.0.20
-        version: 5.0.20(zod@4.4.3)
+        specifier: 5.0.46
+        version: 5.0.46(zod@4.4.3)
       '@aws-sdk/client-s3':
         specifier: ^3.1141.0
         version: 3.1141.0
@@ -1345,9 +1345,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      three:
-        specifier: 0.185.1
-        version: 0.185.1
       yaml:
         specifier: ^2.8.1
         version: 2.9.1
@@ -1385,9 +1382,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.5
         version: 19.2.5(@types/react@19.2.18)
-      '@types/three':
-        specifier: 0.185.4
-        version: 0.185.4
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -1485,6 +1479,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@5.0.81':
+    resolution: {integrity: sha512-pfvvdQ3d1WxdBuug/mnGEP6E48cPokwD8dMBnsFeeAUp0/rb/H2aj0f3mwOiY62gu/Cu5GO44e+SE5nDHyBWMA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@4.0.24':
     resolution: {integrity: sha512-iztFqJTdxNN0ZzqZAAnVPMhRMaL1bfQFa3GIPAffWQ0+dP2FXIkyMD8kHeEI7EpB/C6TR45cqOkrS7YZZ1sATA==}
     engines: {node: '>=22'}
@@ -1493,8 +1493,12 @@ packages:
     resolution: {integrity: sha512-BZ443uBEq6HuMA+Z4b7Hpm65GpZSo7pWqnYqpf/7tAO3C48JbtvAhOE2JnODFj+jodsZzfRHkAyQb64xuD2tZQ==}
     engines: {node: '>=22'}
 
-  '@ai-sdk/xai@5.0.20':
-    resolution: {integrity: sha512-rFyfg0QU3vB9aYJNsvjk7RpcleR9JwlaAynoakGnhqTKmvWGQcRrkkUXADqt1Qnkt5TYTYkgQDoSv85PcL9CbQ==}
+  '@ai-sdk/provider@4.0.38':
+    resolution: {integrity: sha512-GElz70UUCuDFFyD6m6aQJFgRY0HEABQzB5otzgkrisYaF5mnss7o0upAmbBTSD6KWiM9h7lZm1ls2c7xzHR8CA==}
+    engines: {node: '>=22'}
+
+  '@ai-sdk/xai@5.0.46':
+    resolution: {integrity: sha512-5VKUxcEt1aByfktW5W/pg98xpKwgizyZgR0auorWbkiAO2sfUo17TVuvCnEbX1ln9bjEnxYsbu8wJoM+WdWwcA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -9535,6 +9539,14 @@ snapshots:
       undici: 7.30.0
       zod: 4.4.3
 
+  '@ai-sdk/provider-utils@5.0.81(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.38
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.1
+      zod: 4.4.3
+
   '@ai-sdk/provider@4.0.24':
     dependencies:
       json-schema: 0.4.0
@@ -9543,10 +9555,14 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/xai@5.0.20(zod@4.4.3)':
+  '@ai-sdk/provider@4.0.38':
     dependencies:
-      '@ai-sdk/provider': 4.0.26
-      '@ai-sdk/provider-utils': 5.0.58(zod@4.4.3)
+      json-schema: 0.4.0
+
+  '@ai-sdk/xai@5.0.46(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.38
+      '@ai-sdk/provider-utils': 5.0.81(zod@4.4.3)
       zod: 4.4.3
 
   '@antfu/install-pkg@2.1.0':
